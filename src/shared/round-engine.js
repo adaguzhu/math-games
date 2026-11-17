@@ -32,7 +32,17 @@ export function buildRoundQuestionsFromMap({ modeId, generatorsByMode, mixSchedu
 }
 
 export function createRoundState(modeId, questions) {
-  const firstType = questions && questions[0] ? questions[0].inputType : 'numpad';
+  const firstQ = questions && questions[0] ? questions[0] : null;
+  const firstType = firstQ ? firstQ.inputType : 'numpad';
+  const slotBufs = {};
+  let activeSlot = firstType === 'step_pair' ? 'a' : 'q';
+  if (firstType === 'multi_slot' && Array.isArray(firstQ.slots) && firstQ.slots.length > 0) {
+    firstQ.slots.forEach(s => {
+      slotBufs[s.id] = '';
+    });
+    activeSlot = firstQ.slots[0].id;
+  }
+
   return {
     modeId,
     questions,
@@ -48,10 +58,14 @@ export function createRoundState(modeId, questions) {
     rBuf: '',
     aBuf: '',
     bBuf: '',
-    activeSlot: firstType === 'step_pair' ? 'a' : 'q',
+    slotBufs,
+    lockedSlots: new Set(),
+    activeSlot,
     multiSelected: new Set(),
     sieveOpen: false,
     sieveCrossed: new Set(),
+    chartOpen: false,
+    chartSpotlight: null,
     tenFrameOpen: false,
     tenFrameCells: new Array(20).fill(0)
   };
@@ -65,6 +79,9 @@ export function formatCorrectAnswer(q) {
   if (q.inputType === 'step_pair' && q.answer && typeof q.answer === 'object') {
     return `${q.answer.a}, ${q.answer.b}`;
   }
+  if (q.inputType === 'multi_slot' && q.answer && typeof q.answer === 'object' && Array.isArray(q.slots)) {
+    return q.slots.map(s => `${s.shortLabel || s.label}: ${q.answer[s.id]}`).join(', ');
+  }
   if (Array.isArray(q.answer)) {
     return q.answer.join(', ');
   }
@@ -73,6 +90,9 @@ export function formatCorrectAnswer(q) {
 
 export function buildMistakePromptText(q) {
   const base = stripHtml(q.prompt);
+  if (typeof q.mistakeSummary === 'string' && q.mistakeSummary.trim()) {
+    return `${base} (${q.mistakeSummary.trim()})`;
+  }
   if (!q.stageHTML) return base;
   if (q.skillKey === 'div_qr' || q.skillKey === 'fac_pair' || q.skillKey === 'prime_tree') {
     const eq = stripHtml(q.stageHTML).replace(/\s*\?\s*/g, ' ? ').replace(/\s+/g, ' ').trim();

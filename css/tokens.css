@@ -59,3 +59,19 @@
   --jade-100: #DCFCE7;
   --jade-50: #F0FDF4;
 }
+
+/* Warm Sunlit Sky Theme (Game 3: 100-Chart Cross Puzzles) */
+[data-theme="sky"] {
+  --bg-parchment: #F4F9FD;
+  --bg-parchment-deep: #E1EFFA;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #EDF5FC;
+  --border-warm: #C8DDF0;
+  --border-strong: #9EC2E2;
+
+  --jade-700: #0369A1;
+  --jade-600: #0284C7;
+  --jade-500: #0EA5E9;
+  --jade-100: #E0F2FE;
+  --jade-50: #F0F9FF;
+}

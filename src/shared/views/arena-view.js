@@ -14,7 +14,7 @@ import {
   recordMistakeInSave,
   recordSkillAttemptInSave
 } from '../round-engine.js';
-import { renderSieveDrawerHTML, renderTenFrameDrawerHTML } from '../manipulatives.js';
+import { renderHundredsChartDrawerHTML, renderSieveDrawerHTML, renderTenFrameDrawerHTML } from '../manipulatives.js';
 
 export function createArenaController({
   arenaEl,
@@ -117,18 +117,26 @@ export function createArenaController({
     const panel = document.getElementById('input-panel');
     if (!panel) return;
 
-    if (q.inputType === 'numpad' || q.inputType === 'quot_rem' || q.inputType === 'step_pair') {
+    if (q.inputType === 'numpad' || q.inputType === 'quot_rem' || q.inputType === 'step_pair' || q.inputType === 'multi_slot') {
+      const isMultiSlot = q.inputType === 'multi_slot';
+      const slots = isMultiSlot && Array.isArray(q.slots) ? q.slots : [];
       const isDual = q.inputType === 'quot_rem' || q.inputType === 'step_pair';
+      const showSwitch = isDual || (isMultiSlot && slots.length > 1);
       let switchLabel = '';
+      let switchAction = 'toggle-dual-slot';
       if (q.inputType === 'quot_rem') {
         switchLabel = 'Editing: Quotient → Tap for Remainder (R)';
       } else if (q.inputType === 'step_pair') {
         const labels = getStepLabels(q);
         switchLabel = `Editing: ${escapeHtml(labels.a)} → Tap for ${escapeHtml(labels.b)}`;
+      } else if (isMultiSlot && slots.length > 1) {
+        switchAction = 'cycle-multi-slot';
+        switchLabel = `Editing: ${escapeHtml(slots[0].label)} • Tap Next Box ↻`;
       }
+      const enterLabel = (isDual || (isMultiSlot && slots.length > 1)) ? 'Next ➔' : 'Check ✓';
       panel.innerHTML = `
         <div class="numpad-grid">
-          ${isDual ? `<button type="button" id="btn-switch-qr" class="num-key key-switch" data-action="toggle-dual-slot">${switchLabel}</button>` : ''}
+          ${showSwitch ? `<button type="button" id="btn-switch-qr" class="num-key key-switch" data-action="${switchAction}">${switchLabel}</button>` : ''}
           <button type="button" class="num-key" data-action="press-digit" data-digit="1">1</button>
           <button type="button" class="num-key" data-action="press-digit" data-digit="2">2</button>
           <button type="button" class="num-key" data-action="press-digit" data-digit="3">3</button>
@@ -140,7 +148,7 @@ export function createArenaController({
           <button type="button" class="num-key" data-action="press-digit" data-digit="9">9</button>
           <button type="button" class="num-key key-back" data-action="press-backspace">⌫</button>
           <button type="button" class="num-key" data-action="press-digit" data-digit="0">0</button>
-          <button type="button" id="btn-numpad-enter" class="num-key key-enter" data-action="press-enter">${isDual ? 'Next ➔' : 'Check ✓'}</button>
+          <button type="button" id="btn-numpad-enter" class="num-key key-enter" data-action="press-enter">${enterLabel}</button>
         </div>
       `;
       return;
@@ -189,10 +197,21 @@ export function createArenaController({
     roundState.rBuf = '';
     roundState.aBuf = '';
     roundState.bBuf = '';
-    roundState.activeSlot = q.inputType === 'step_pair' ? 'a' : 'q';
+    roundState.slotBufs = {};
+    roundState.lockedSlots = new Set();
+    if (q.inputType === 'multi_slot' && Array.isArray(q.slots) && q.slots.length > 0) {
+      q.slots.forEach(s => {
+        roundState.slotBufs[s.id] = '';
+      });
+      roundState.activeSlot = q.slots[0].id;
+    } else {
+      roundState.activeSlot = q.inputType === 'step_pair' ? 'a' : 'q';
+    }
     roundState.multiSelected = new Set();
     roundState.sieveOpen = false;
     roundState.sieveCrossed = new Set();
+    roundState.chartOpen = false;
+    roundState.chartSpotlight = null;
     roundState.tenFrameOpen = false;
     roundState.tenFrameCells = new Array(20).fill(0);
 
@@ -215,6 +234,9 @@ export function createArenaController({
     if (q.enableSieve) {
       helperButtons.push('<button type="button" class="helper-toggle-btn" data-action="toggle-sieve-grid">🔢 Toggle 1–100 Detective Grid</button>');
     }
+    if (q.enableHundredsChart) {
+      helperButtons.push(`<button type="button" class="helper-toggle-btn" data-action="toggle-hundreds-chart">🗺️ Peek at 1–${q.chartMax || 100} Chart</button>`);
+    }
     if (q.enableTenFrame) {
       helperButtons.push('<button type="button" class="helper-toggle-btn" data-action="toggle-tenframe-drawer">🧮 Toggle 20-Frame Counters</button>');
     }
@@ -235,12 +257,51 @@ export function createArenaController({
         ${helperButtons.length ? `<div class="stage-helper-row">${helperButtons.join('')}</div>` : ''}
         <div id="helper-peek-box" class="helper-peek-box hidden"></div>
         <div id="sieve-container" class="hidden"></div>
+        <div id="hundreds-chart-container" class="hidden"></div>
         <div id="tenframe-container" class="hidden"></div>
       `;
     }
 
     renderInputPanel(q);
+    if (q.inputType === 'multi_slot') {
+      syncMultiSlotDisplay();
+    }
     startFluencyTimer(q.fluencySeconds || 16);
+  }
+
+  function syncMultiSlotDisplay() {
+    if (!roundState) return;
+    const q = roundState.questions[roundState.index];
+    if (!q || !Array.isArray(q.slots)) return;
+
+    q.slots.forEach(s => {
+      const el = document.getElementById(`mslot-${s.id}`);
+      if (!el) return;
+      const isLocked = roundState.lockedSlots.has(s.id);
+      const buf = roundState.slotBufs[s.id] || '';
+      const valEl = el.querySelector('.cross-slot-val') || el;
+      valEl.textContent = buf === '' ? '?' : buf;
+      el.classList.toggle('active', roundState.activeSlot === s.id && !isLocked);
+      el.classList.toggle('slot-locked-ok', isLocked);
+    });
+
+    const unlocked = q.slots.filter(s => !roundState.lockedSlots.has(s.id));
+    const sw = document.getElementById('btn-switch-qr');
+    if (sw) {
+      if (unlocked.length <= 1) {
+        sw.classList.add('hidden');
+      } else {
+        sw.classList.remove('hidden');
+        const activeMeta = q.slots.find(s => s.id === roundState.activeSlot) || unlocked[0];
+        sw.textContent = `Editing: ${activeMeta.label} • Tap Next Box ↻`;
+      }
+    }
+
+    const ent = document.getElementById('btn-numpad-enter');
+    if (ent) {
+      const allUnlockedFilled = unlocked.length > 0 && unlocked.every(s => (roundState.slotBufs[s.id] || '') !== '');
+      ent.textContent = allUnlockedFilled ? 'Check ✓' : 'Next ➔';
+    }
   }
 
   function syncDualDisplay() {
@@ -481,6 +542,14 @@ export function createArenaController({
     }
   }
 
+  const SPATIAL_MOVES = {
+    top:    { ArrowDown: ['center', 'bottom'], ArrowLeft: ['left'], ArrowRight: ['right'] },
+    center: { ArrowUp: ['top'], ArrowDown: ['bottom'], ArrowLeft: ['left'], ArrowRight: ['right'] },
+    bottom: { ArrowUp: ['center', 'top'], ArrowLeft: ['left'], ArrowRight: ['right'] },
+    left:   { ArrowUp: ['top'], ArrowDown: ['bottom'], ArrowRight: ['center', 'right'] },
+    right:  { ArrowUp: ['top'], ArrowDown: ['bottom'], ArrowLeft: ['center', 'left'] }
+  };
+
   function pressDigit(d) {
     if (!roundState || roundState.lockedTransition) return;
     const q = roundState.questions[roundState.index];
@@ -490,7 +559,7 @@ export function createArenaController({
       if (roundState.numBuf.length >= 3) return;
       roundState.numBuf = roundState.numBuf === '0' ? d : roundState.numBuf + d;
       const slot = document.getElementById('slot-main');
-      if (slot) slot.textContent = roundState.numBuf;
+      if (slot) (slot.querySelector('.cross-slot-val') || slot).textContent = roundState.numBuf;
     } else if (q.inputType === 'quot_rem') {
       if (roundState.activeSlot === 'q') {
         if (roundState.qBuf.length >= 2) return;
@@ -509,6 +578,15 @@ export function createArenaController({
         roundState.bBuf = roundState.bBuf === '0' ? d : roundState.bBuf + d;
       }
       syncDualDisplay();
+    } else if (q.inputType === 'multi_slot') {
+      const sid = roundState.activeSlot;
+      if (!sid || roundState.lockedSlots.has(sid)) return;
+      const slotMeta = (q.slots || []).find(s => s.id === sid);
+      const maxDigits = (slotMeta && slotMeta.maxDigits) || 3;
+      const cur = roundState.slotBufs[sid] || '';
+      if (cur.length >= maxDigits) return;
+      roundState.slotBufs[sid] = cur === '0' ? d : cur + d;
+      syncMultiSlotDisplay();
     }
   }
 
@@ -520,7 +598,7 @@ export function createArenaController({
     if (q.inputType === 'numpad') {
       roundState.numBuf = roundState.numBuf.slice(0, -1);
       const slot = document.getElementById('slot-main');
-      if (slot) slot.textContent = roundState.numBuf === '' ? '?' : roundState.numBuf;
+      if (slot) (slot.querySelector('.cross-slot-val') || slot).textContent = roundState.numBuf === '' ? '?' : roundState.numBuf;
     } else if (q.inputType === 'quot_rem') {
       if (roundState.activeSlot === 'r' && roundState.rBuf === '') {
         roundState.activeSlot = 'q';
@@ -541,6 +619,21 @@ export function createArenaController({
         roundState.bBuf = roundState.bBuf.slice(0, -1);
       }
       syncDualDisplay();
+    } else if (q.inputType === 'multi_slot') {
+      const unlocked = (q.slots || []).filter(s => !roundState.lockedSlots.has(s.id));
+      if (unlocked.length === 0) return;
+      let curIdx = unlocked.findIndex(s => s.id === roundState.activeSlot);
+      if (curIdx < 0) {
+        curIdx = 0;
+        roundState.activeSlot = unlocked[0].id;
+      }
+      const curBuf = roundState.slotBufs[roundState.activeSlot] || '';
+      if (curBuf === '' && curIdx > 0) {
+        roundState.activeSlot = unlocked[curIdx - 1].id;
+      }
+      const sid = roundState.activeSlot;
+      roundState.slotBufs[sid] = (roundState.slotBufs[sid] || '').slice(0, -1);
+      syncMultiSlotDisplay();
     }
   }
 
@@ -563,7 +656,9 @@ export function createArenaController({
         }
         roundState.numBuf = '';
         setTimeout(() => {
-          if (slot && roundState && !roundState.lockedTransition) slot.textContent = '?';
+          if (slot && roundState && !roundState.lockedTransition) {
+            (slot.querySelector('.cross-slot-val') || slot).textContent = '?';
+          }
         }, 340);
         handleWrongAttempt(`Enter <strong>${q.answer}</strong> on the keypad to lock it into memory!`);
       }
@@ -631,13 +726,83 @@ export function createArenaController({
         }, 360);
         handleWrongAttempt(`Now enter <strong>${q.answer.a}</strong> in the first box and <strong>${q.answer.b}</strong> in the second box to lock it into memory!`);
       }
+      return;
+    }
+
+    if (q.inputType === 'multi_slot') {
+      const slots = q.slots || [];
+      const unlocked = slots.filter(s => !roundState.lockedSlots.has(s.id));
+      const hasEmptyUnlocked = unlocked.some(u => (roundState.slotBufs[u.id] || '') === '');
+
+      if (hasEmptyUnlocked) {
+        if ((roundState.slotBufs[roundState.activeSlot] || '') === '') return;
+        const curPos = Math.max(0, unlocked.findIndex(s => s.id === roundState.activeSlot));
+        for (let step = 1; step <= unlocked.length; step++) {
+          const cand = unlocked[(curPos + step) % unlocked.length];
+          if ((roundState.slotBufs[cand.id] || '') === '') {
+            roundState.activeSlot = cand.id;
+            break;
+          }
+        }
+        SFX.tap();
+        syncMultiSlotDisplay();
+        return;
+      }
+
+      const allMatch = slots.every(s => Number(roundState.slotBufs[s.id]) === q.answer[s.id]);
+      if (allMatch) {
+        slots.forEach(s => {
+          document.getElementById(`mslot-${s.id}`)?.classList.add('correct-flash');
+        });
+        handleCorrectSolve();
+        return;
+      }
+
+      slots.forEach(s => {
+        if (!roundState.lockedSlots.has(s.id) && Number(roundState.slotBufs[s.id]) === q.answer[s.id]) {
+          roundState.lockedSlots.add(s.id);
+        }
+      });
+
+      const wrongSlots = slots.filter(s => !roundState.lockedSlots.has(s.id));
+      slots.forEach(s => {
+        const el = document.getElementById(`mslot-${s.id}`);
+        if (!el) return;
+        if (roundState.lockedSlots.has(s.id)) {
+          el.classList.remove('active', 'wrong-flash');
+          el.classList.add('slot-locked-ok');
+        } else {
+          el.classList.remove('wrong-flash');
+          void el.offsetWidth;
+          el.classList.add('wrong-flash');
+          roundState.slotBufs[s.id] = '';
+        }
+      });
+
+      if (wrongSlots.length > 0) {
+        roundState.activeSlot = wrongSlots[0].id;
+      }
+
+      setTimeout(() => {
+        if (!roundState || roundState.lockedTransition) return;
+        wrongSlots.forEach(ws => document.getElementById(`mslot-${ws.id}`)?.classList.remove('wrong-flash'));
+        syncMultiSlotDisplay();
+      }, 360);
+
+      const fixList = wrongSlots
+        .map(ws => `<strong>${escapeHtml(ws.shortLabel || ws.label)}: ${q.answer[ws.id]}</strong>`)
+        .join(', ');
+      const retryHTML = roundState.lockedSlots.size > 0
+        ? `Nice job locking in ${roundState.lockedSlots.size} ${roundState.lockedSlots.size === 1 ? 'box' : 'boxes'}! Now enter ${fixList} to lock it into memory!`
+        : `Enter ${fixList} to lock it into memory!`;
+      handleWrongAttempt(retryHTML);
     }
   }
 
   function handleKeyDown(e) {
     if (!roundState || roundState.lockedTransition) return;
     const q = roundState.questions[roundState.index];
-    if (q.inputType !== 'numpad' && q.inputType !== 'quot_rem' && q.inputType !== 'step_pair') return;
+    if (q.inputType !== 'numpad' && q.inputType !== 'quot_rem' && q.inputType !== 'step_pair' && q.inputType !== 'multi_slot') return;
     if (e.key >= '0' && e.key <= '9') {
       e.preventDefault();
       pressDigit(e.key);
@@ -655,6 +820,25 @@ export function createArenaController({
         roundState.activeSlot = roundState.activeSlot === 'a' ? 'b' : 'a';
         SFX.tap();
         syncDualDisplay();
+      } else if (q.inputType === 'multi_slot' && e.key === 'Tab') {
+        const unlocked = (q.slots || []).filter(s => !roundState.lockedSlots.has(s.id));
+        if (unlocked.length > 1) {
+          e.preventDefault();
+          const curIdx = Math.max(0, unlocked.findIndex(s => s.id === roundState.activeSlot));
+          const delta = e.shiftKey ? -1 : 1;
+          roundState.activeSlot = unlocked[(curIdx + delta + unlocked.length) % unlocked.length].id;
+          SFX.tap();
+          syncMultiSlotDisplay();
+        }
+      }
+    } else if (q.inputType === 'multi_slot' && SPATIAL_MOVES[roundState.activeSlot]?.[e.key]) {
+      const unlockedIds = new Set((q.slots || []).filter(s => !roundState.lockedSlots.has(s.id)).map(s => s.id));
+      const targetId = SPATIAL_MOVES[roundState.activeSlot][e.key].find(cand => unlockedIds.has(cand));
+      if (targetId) {
+        e.preventDefault();
+        roundState.activeSlot = targetId;
+        SFX.tap();
+        syncMultiSlotDisplay();
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
@@ -792,6 +976,65 @@ export function createArenaController({
         else roundState.sieveCrossed.add(n);
         const container = document.getElementById('sieve-container');
         if (container) container.innerHTML = renderSieveDrawerHTML(roundState.sieveCrossed);
+        return true;
+      }
+      case 'focus-multi-slot': {
+        if (roundState && !roundState.lockedTransition) {
+          const q = roundState.questions[roundState.index];
+          const sid = actionEl.dataset.slot;
+          if (q.inputType === 'multi_slot' && (q.slots || []).some(s => s.id === sid) && !roundState.lockedSlots.has(sid)) {
+            SFX.tap();
+            roundState.activeSlot = sid;
+            syncMultiSlotDisplay();
+          }
+        }
+        return true;
+      }
+      case 'cycle-multi-slot': {
+        if (roundState && !roundState.lockedTransition) {
+          const q = roundState.questions[roundState.index];
+          const unlocked = (q.slots || []).filter(s => !roundState.lockedSlots.has(s.id));
+          if (unlocked.length > 1) {
+            const idx = Math.max(0, unlocked.findIndex(s => s.id === roundState.activeSlot));
+            roundState.activeSlot = unlocked[(idx + 1) % unlocked.length].id;
+            SFX.tap();
+            syncMultiSlotDisplay();
+          }
+        }
+        return true;
+      }
+      case 'toggle-hundreds-chart': {
+        if (!roundState) return true;
+        SFX.tap();
+        roundState.chartOpen = !roundState.chartOpen;
+        const container = document.getElementById('hundreds-chart-container');
+        const q = roundState.questions[roundState.index];
+        if (container) {
+          container.classList.toggle('hidden', !roundState.chartOpen);
+          if (roundState.chartOpen) {
+            container.innerHTML = renderHundredsChartDrawerHTML({
+              maxNum: q.chartMax || 100,
+              spotlightNum: roundState.chartSpotlight,
+              clueNums: q.chartClues || []
+            });
+          }
+        }
+        return true;
+      }
+      case 'spotlight-chart-num': {
+        if (!roundState) return true;
+        SFX.tap();
+        const num = Number(actionEl.dataset.num);
+        roundState.chartSpotlight = roundState.chartSpotlight === num ? null : num;
+        const container = document.getElementById('hundreds-chart-container');
+        const q = roundState.questions[roundState.index];
+        if (container && roundState.chartOpen) {
+          container.innerHTML = renderHundredsChartDrawerHTML({
+            maxNum: q.chartMax || 100,
+            spotlightNum: roundState.chartSpotlight,
+            clueNums: q.chartClues || []
+          });
+        }
         return true;
       }
       case 'toggle-tenframe-drawer': {

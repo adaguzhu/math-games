@@ -1,3 +1,5 @@
+import { escapeHtml } from './dom.js';
+
 export function renderSieveDrawerHTML(sieveCrossed) {
   let cells = '<div class="sieve-grid">';
   for (let n = 1; n <= 100; n++) {
@@ -288,6 +290,187 @@ export function buildNumberPathHopsHTML({
       <div class="number-path-row" style="grid-template-columns: repeat(${count}, 1fr);">
         ${tilesHTML}
       </div>
+    </div>
+  `;
+}
+
+const CROSS_DIR_BADGES = {
+  top: '↑ −10',
+  bottom: '↓ +10',
+  left: '← −1',
+  right: '→ +1'
+};
+
+const CROSS_POS_ARIA = {
+  top: 'Top square (10 less)',
+  left: 'Left square (1 less)',
+  center: 'Middle square',
+  right: 'Right square (1 more)',
+  bottom: 'Bottom square (10 more)'
+};
+
+/**
+ * 100-Chart / 120-Chart 5-cell Cross Cutout Puzzle.
+ */
+export function buildCrossPuzzleHTML({
+  center,
+  givenPositions = [],
+  blankSlots = [],
+  singleMainSlotPos = null,
+  showDirectionBadges = false,
+  highlightCenterFirst = false,
+  overrideValues = {}
+}) {
+  const trueVals = {
+    top: center - 10,
+    left: center - 1,
+    center,
+    right: center + 1,
+    bottom: center + 10
+  };
+  const givenSet = new Set(givenPositions);
+  const blankSet = new Set(blankSlots);
+
+  const badgeFor = (pos) => {
+    if (highlightCenterFirst && pos === 'center') {
+      return '<span class="cross-dir-tag center-first-tag">1st: Middle</span>';
+    }
+    if (showDirectionBadges && CROSS_DIR_BADGES[pos]) {
+      return `<span class="cross-dir-tag">${CROSS_DIR_BADGES[pos]}</span>`;
+    }
+    return '';
+  };
+
+  const renderCell = (pos) => {
+    if (givenSet.has(pos)) {
+      const val = overrideValues[pos] !== undefined ? overrideValues[pos] : trueVals[pos];
+      return `<div class="cross-cell pos-${pos} given">${val}</div>`;
+    }
+    if (singleMainSlotPos === pos) {
+      return `<div id="slot-main" class="cross-cell pos-${pos} blank answer-slot active">${badgeFor(pos)}<span class="cross-slot-val">?</span></div>`;
+    }
+    if (blankSet.has(pos)) {
+      const isFirst = blankSlots[0] === pos;
+      return `<button type="button" id="mslot-${pos}" class="cross-cell pos-${pos} blank answer-slot ${isFirst ? 'active' : ''}" data-action="focus-multi-slot" data-slot="${pos}" aria-label="${escapeHtml(CROSS_POS_ARIA[pos] || pos)}">${badgeFor(pos)}<span class="cross-slot-val">?</span></button>`;
+    }
+    return '<div class="cross-spacer"></div>';
+  };
+
+  return `
+    <div class="chart-cross-wrap">
+      <div class="chart-cross-grid">
+        <div class="cross-spacer"></div>
+        ${renderCell('top')}
+        <div class="cross-spacer"></div>
+        ${renderCell('left')}
+        ${renderCell('center')}
+        ${renderCell('right')}
+        <div class="cross-spacer"></div>
+        ${renderCell('bottom')}
+        <div class="cross-spacer"></div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Contiguous 2- or 3-cell vertical column or horizontal row cutout from a 100/120-chart.
+ */
+export function buildChartStripHTML({ cells, orientation = 'vertical', arrowBadge = '', captionHTML = '' }) {
+  const cellsHTML = (cells || []).map(cell => {
+    if (cell.val !== undefined && cell.val !== null) {
+      return `<div class="strip-cell given">${cell.val}</div>`;
+    }
+    const badgeHTML = cell.badge ? `<span class="cross-dir-tag">${escapeHtml(cell.badge)}</span>` : '';
+    if (cell.slotId) {
+      return `<div id="${escapeHtml(cell.slotId)}" class="strip-cell blank answer-slot active">${badgeHTML}<span class="cross-slot-val">?</span></div>`;
+    }
+    if (cell.multiSlotId) {
+      const sid = escapeHtml(cell.multiSlotId);
+      const aria = escapeHtml(cell.ariaLabel || cell.badge || cell.multiSlotId);
+      return `<button type="button" id="mslot-${sid}" class="strip-cell blank answer-slot ${cell.active ? 'active' : ''}" data-action="focus-multi-slot" data-slot="${sid}" aria-label="${aria}">${badgeHTML}<span class="cross-slot-val">?</span></button>`;
+    }
+    return '';
+  }).join('');
+
+  return `
+    <div class="chart-strip-wrap">
+      ${arrowBadge ? `<div class="chart-strip-badge">${escapeHtml(arrowBadge)}</div>` : ''}
+      <div class="chart-strip-grid ${orientation === 'horizontal' ? 'horizontal' : 'vertical'}">
+        ${cellsHTML}
+      </div>
+      ${captionHTML ? `<div class="slide-caption">${captionHTML}</div>` : ''}
+    </div>
+  `;
+}
+
+/**
+ * 3x3 window cutout from a 100-chart with 1 mystery square (`#slot-main`).
+ */
+export function buildMiniWindow3x3HTML({ topLeft, givenNums, mysteryNum, blankPosLabel = 'Mystery Square' }) {
+  const givenSet = Array.isArray(givenNums) ? new Set(givenNums) : null;
+  let cellsHTML = '';
+  for (let dr = 0; dr < 3; dr++) {
+    for (let dc = 0; dc < 3; dc++) {
+      const n = topLeft + dr * 10 + dc;
+      if (n === mysteryNum) {
+        cellsHTML += `<div id="slot-main" class="mini-win-cell blank answer-slot active" aria-label="${escapeHtml(blankPosLabel)}"><span class="cross-slot-val">?</span></div>`;
+      } else if (!givenSet || givenSet.has(n)) {
+        cellsHTML += `<div class="mini-win-cell given">${n}</div>`;
+      } else {
+        cellsHTML += '<div class="mini-win-cell blank-muted">•</div>';
+      }
+    }
+  }
+  return `
+    <div class="mini-window-wrap">
+      <div class="mini-window-3x3">${cellsHTML}</div>
+    </div>
+  `;
+}
+
+/**
+ * Interactive 10-column 1..100 or 1..120 chart helper drawer with clue highlights & cross spotlighting.
+ */
+export function renderHundredsChartDrawerHTML({ maxNum = 100, spotlightNum = null, clueNums = [] }) {
+  const clueSet = new Set(Array.isArray(clueNums) ? clueNums : []);
+  const s = (typeof spotlightNum === 'number' && Number.isInteger(spotlightNum) && spotlightNum >= 1 && spotlightNum <= maxNum)
+    ? spotlightNum
+    : null;
+
+  const up = s !== null && s - 10 >= 1 ? s - 10 : null;
+  const down = s !== null && s + 10 <= maxNum ? s + 10 : null;
+  const left = s !== null && (s - 1) % 10 !== 0 && s - 1 >= 1 ? s - 1 : null;
+  const right = s !== null && s % 10 !== 0 && s + 1 <= maxNum ? s + 1 : null;
+
+  let cellsHTML = '';
+  for (let n = 1; n <= maxNum; n++) {
+    const cls = ['hc-cell'];
+    if (clueSet.has(n)) cls.push('is-clue');
+    if (n === s) cls.push('spot-center');
+    else if (n === up) cls.push('spot-up');
+    else if (n === down) cls.push('spot-down');
+    else if (n === left || n === right) cls.push('spot-side');
+    cellsHTML += `<button type="button" class="${cls.join(' ')}" data-action="spotlight-chart-num" data-num="${n}">${n}</button>`;
+  }
+
+  let captionHTML;
+  if (s === null) {
+    captionHTML = '✨ Gold boxes show your puzzle clues! Tap any number to light up its + Cross neighbors!';
+  } else {
+    const parts = [
+      up !== null ? `↑ ${up} (−10)` : '↑ top edge',
+      left !== null ? `← ${left} (−1)` : '← row edge',
+      right !== null ? `→ ${right} (+1)` : '→ row edge',
+      down !== null ? `↓ ${down} (+10)` : '↓ bottom edge'
+    ];
+    captionHTML = `<strong>Cross at ${s}:</strong> ${parts.join(' • ')}`;
+  }
+
+  return `
+    <div class="hundreds-chart-drawer">
+      <div class="hc-grid">${cellsHTML}</div>
+      <div class="hc-caption">${captionHTML}</div>
     </div>
   `;
 }

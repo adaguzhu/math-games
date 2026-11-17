@@ -234,6 +234,11 @@
   border-bottom-color: #15803D;
 }
 
+.arcade-game-card[data-card-theme="sky"] .arcade-play-cta {
+  background: #0284C7;
+  border-bottom-color: #0369A1;
+}
+
 @media (max-width: 680px) {
   .arcade-topbar {
     padding: 12px 14px;

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { GAMES } from '../src/games/registry.js';
 import { FACTORS_AND_MULTIPLES_GAME } from '../src/games/factors-and-multiples/index.js';
 import { ADDITION_SUBTRACTION_GAME } from '../src/games/addition-subtraction/index.js';
+import { HUNDREDS_CHART_GAME } from '../src/games/hundreds-chart/index.js';
 import {
   FAMILY_STORAGE_KEY,
   LEGACY_WINGS_KEY,
@@ -44,6 +45,12 @@ test('Default profiles use puppy avatar for grade1 and strict per-profile game a
 
   assert.equal(FACTORS_AND_MULTIPLES_GAME.assignedProfileId, 'grade3');
   assert.equal(ADDITION_SUBTRACTION_GAME.assignedProfileId, 'grade1');
+  assert.equal(HUNDREDS_CHART_GAME.assignedProfileId, 'grade1');
+
+  const g1Chart = getGameSave(family, 'grade1', HUNDREDS_CHART_GAME);
+  assert.equal(g1Chart.activeBuddyId, '11_cat_kid');
+  assert.equal(g1Chart.pace, 'relaxed');
+  assert.deepEqual(g1Chart.unlockedDragons, ['11_cat_kid']);
 });
 
 test('Automatic non-destructive legacy migration from wings_of_math_save_v1 to grade3 factors-and-multiples', () => {

@@ -27,6 +27,13 @@ body[data-theme="meadow"] {
     radial-gradient(circle at 50% 92%, rgba(244, 114, 182, 0.07) 0%, transparent 45%);
 }
 
+body[data-theme="sky"] {
+  background-image:
+    radial-gradient(circle at 14% 10%, rgba(14, 165, 233, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 88% 16%, rgba(250, 204, 21, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 50% 92%, rgba(56, 189, 248, 0.08) 0%, transparent 45%);
+}
+
 button {
   font-family: inherit;
   cursor: pointer;
