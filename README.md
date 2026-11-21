@@ -1,6 +1,6 @@
 # Family Math Arcade
 
-A zero-build, static HTML/CSS/ES-module math arcade for elementary learners, featuring independent kid profiles, strict per-profile game assignment, three full games built on a shared XtraMath-style practice engine, synthesized Web Audio feedback, and a PIN-protected Parent Dashboard.
+A zero-build, static HTML/CSS/ES-module math arcade for elementary learners, featuring independent kid profiles, strict per-profile game assignment, four full games built on a shared XtraMath-style practice engine, synthesized Web Audio feedback, and a PIN-protected Parent Dashboard.
 
 ## Games Included
 
@@ -13,6 +13,12 @@ A zero-build, static HTML/CSS/ES-module math arcade for elementary learners, fea
 3. **100-Chart Cross Puzzles** (1st Grade — `#/game/hundreds-chart`, assigned to `grade1`)
    - Built around i-Ready Grade 1 Lesson 14C (*"Finish the Puzzle"* — 100-chart & 120-chart cross cutouts) with a sunlit Sky theme, multi-box cross input with partial progress lock-in, interactive 1–100 / 1–120 chart peek with clue highlighting and cross spotlighting, and 29 collectible Dog Man & Supa Buddies Chart Detectives led by Cat Kid.
    - Modes: **Supa Chart Daily Mix**, **10 Less, 10 More & ±1 Hops**, **Center-Clue Crosses**, **Two-Clue Crosses (Find Middle!)**, **One-Clue Cross Detective**, **Chart Windows & Oops Detective**, and **Beyond 100: The 120-Chart!**.
+4. **Money Match: Dragon Hoard Duel** (3rd Grade — `#/game/money-match`, assigned to `grade3`)
+   - **The goal is to get the most money:** two treasure hoards face off and the child taps the amount that puts the MOST money in their purse — `$478` versus `$239 + $245`, `−$462` versus `−$219 + −$248`, a pile of real bills and coins versus one flat amount like `$386.65`, or equal-group market stories like `7 × $34` versus `$245`. Hoards render as tappable treasure cards with explicit `+` sums, green cash chips and red IOU chips, plus a `> < =` reveal in the coaching feedback. A `🎯 Goal: walk away with the MOST money!` banner sits above every duel, switching to `…take the debt you owe the LEAST of!` whenever both sides are in the red.
+   - **Challenge numbers, one difficulty:** every quest is written for advanced 3rd graders and stays inside grade-3 place value (nothing leaves `$1,000`), but the generators deliberately build *close calls* — the two sides usually differ by well under 10%, so the puzzle has to be calculated, not eyeballed. Amounts are 3-digit sums of two or three piles, bills up to `$100` (with the occasional `$2` bill) landing on odd cents, up to three signed amounts per pocket, and `2-digit × 1-digit` market deals such as `8 × $47`.
+   - **Negative money is a first-class quest:** the *Debt Duel* quest only ever generates debts below `$0`, so owing less is the better amount, and the guide explains it on a `−$600 … $0 … +$600` money line.
+   - **The egg rule:** this game awards **1 ⭐ per first-try match** (via the optional `gameDef.calculateRoundStars` hook in the shared progression engine), so **ten correct choices fills an egg bar `10/10 ⭐` and hatches a dragon** — with a `+1 ⭐` Daily Mix courage bonus on top. 22 collectible Hoard Dragons (3 per quest + 3 for the Daily Mix) reuse the dragon portraits already in the repo.
+   - Modes: **Daily Hoard Mix**, **Wallet Showdowns**, **Bill & Coin Stacks**, **Debt Duel (Negative $)**, **Earn & Spend Mix**, **Equal or Not?**, and **Dragon Market Stories**. New `hoard` theme (`css/tokens.css`) and `css/money.css` duel/bill/IOU styling; quest logic lives in `src/games/money-match/`.
 
 ## Running Locally
 
@@ -39,3 +45,5 @@ Run the Node unit & fuzz test suite (Node 18+):
 ```bash
 node --test tests/*.test.js
 ```
+
+`tests/money-match-generators.test.js` fuzzes all six Money Match generators (700 draws each) and asserts the game's core invariant: the recorded answer is always the mathematically greater amount (so the smaller debt wins in the negative quest), ties only ever offer the *They're Equal!* button, and ten first-try matches hatch exactly one dragon egg. A separate challenge-level test keeps the numbers honest: most puzzles must involve `$100+` amounts, three-quarters of the comparisons must be too close to guess, bill piles must still carry odd cents and `$100` bills, and market stories must multiply by 2-digit prices.
