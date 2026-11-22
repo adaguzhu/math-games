@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Family Math Arcade</title>
-  <meta name="description" content="Zero-build interactive math games for elementary learners: Factors & Multiples (3rd Grade) and Addition & Subtraction (1st Grade) with collectible buddies." />
+  <meta name="description" content="Zero-build interactive math games for elementary learners: Factors & Multiples and Multiplication Facts (3rd Grade), plus Addition & Subtraction and 100-Chart Cross Puzzles (1st Grade) with collectible buddies." />
   <link rel="stylesheet" href="./css/tokens.css" />
   <link rel="stylesheet" href="./css/base.css" />
   <link rel="stylesheet" href="./css/arcade.css" />
@@ -32,6 +32,22 @@
       <div id="fluency-bar-fill" class="fluency-bar-fill"></div>
     </div>
 
+    <div id="sprint-pace-hud" class="sprint-pace-hud hidden" aria-live="polite">
+      <div class="sprint-hud-row">
+        <span id="sprint-target-label" class="sprint-hud-label">🎯 100 Facts in 5:00 Pace</span>
+        <span id="sprint-target-status" class="sprint-status-pill">Ready</span>
+      </div>
+      <div class="sprint-race-track">
+        <div id="sprint-you-fill" class="sprint-you-fill" style="width:0%"></div>
+        <div id="sprint-ghost-marker" class="sprint-marker sprint-ghost-marker hidden" style="left:0%" title="Personal Best Ghost">👻</div>
+        <div id="sprint-target-marker" class="sprint-marker sprint-target-marker" style="left:0%" title="Target Pace">🎯</div>
+      </div>
+      <div class="sprint-hud-row sprint-ghost-row">
+        <span id="sprint-ghost-label" class="sprint-hud-sublabel">👻 First Run — Setting Your Ghost Pace!</span>
+        <span id="sprint-ghost-status" class="sprint-status-pill ghost">👻 First Run</span>
+      </div>
+    </div>
+
     <div class="arena-main">
       <!-- LEFT: QUESTION & COACH -->
       <div class="question-panel">
@@ -57,7 +73,7 @@
   <!-- ================= MODAL: ROUND RESULTS ================= -->
   <div id="modal-results" class="modal-backdrop hidden">
     <div class="modal-card">
-      <div style="font-size:0.85rem; font-weight:800; color:var(--jade-700); text-transform:uppercase; letter-spacing:0.05em;">10-Puzzle Series Complete!</div>
+      <div id="results-kicker" style="font-size:0.85rem; font-weight:800; color:var(--jade-700); text-transform:uppercase; letter-spacing:0.05em;">10-Puzzle Series Complete!</div>
       <h2 id="results-headline" style="margin:6px 0 4px; font-size:1.65rem;">Awesome Work!</h2>
       <div id="results-stars-row" class="stars-earned-row">⭐⭐⭐</div>
       <div id="results-breakdown" class="breakdown-list"></div>
@@ -70,7 +86,7 @@
       <div id="results-suggest-wrap"></div>
       <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
         <button type="button" class="secondary-action-btn" data-action="close-results">🏠 Academy Hub</button>
-        <button type="button" class="primary-action-btn" data-action="replay-same-mode">🔄 Play Another 10 →</button>
+        <button type="button" id="btn-results-replay" class="primary-action-btn" data-action="replay-same-mode">🔄 Play Another 10 →</button>
       </div>
     </div>
   </div>
@@ -79,11 +95,11 @@
   <div id="modal-unlock" class="modal-backdrop hidden">
     <div class="modal-card">
       <div id="unlock-egg-step" class="egg-stage" data-action="crack-egg" role="button" tabindex="0">
-        <div style="font-size:0.9rem; font-weight:900; color:var(--gold-600); text-transform:uppercase; letter-spacing:0.06em;">🌟 10-Star Milestone Reached! 🌟</div>
+        <div id="unlock-milestone-kicker" style="font-size:0.9rem; font-weight:900; color:var(--gold-600); text-transform:uppercase; letter-spacing:0.06em;">🌟 10-Star Milestone Reached! 🌟</div>
         <h2 id="unlock-heading" style="margin:8px 0 4px; font-size:1.65rem;">A Dragon Egg Is Hatching!</h2>
         <span id="egg-tribe-hint" class="tribe-pill">Egg</span>
         <div id="unlock-pod-emoji" class="dragon-egg-btn" aria-label="Tap to unlock friend">✨</div>
-        <p style="margin:0; font-size:1rem; font-weight:800; color:var(--jade-700);">👆 Tap the glowing egg to hatch your new friend!</p>
+        <p id="unlock-tap-prompt" style="margin:0; font-size:1rem; font-weight:800; color:var(--jade-700);">👆 Tap the glowing egg to hatch your new friend!</p>
       </div>
 
       <div id="unlock-reveal-step" class="hidden">

@@ -129,3 +129,203 @@ export function syncModeBanksAndBuddyAfterAdminEdit(gameSave, gameDef) {
     gameSave.activeBuddyId = fallback.id;
   }
 }
+
+export function formatDurationClock(totalSeconds) {
+  const secs = Math.max(0, Math.round(Number(totalSeconds) || 0));
+  const mins = Math.floor(secs / 60);
+  const rem = secs % 60;
+  return `${mins}:${String(rem).padStart(2, '0')}`;
+}
+
+export function computeSprintPaceTelemetry({
+  correctSolved = 0,
+  elapsedMs = 0,
+  durationSec = 300,
+  targetFacts = 100,
+  bestPacePerMin = 0,
+  bestScore = 0
+}) {
+  const safeDuration = Math.max(1, Number(durationSec) || 300);
+  const safeTarget = Math.max(1, Number(targetFacts) || 100);
+  const safeSolved = Math.max(0, Number(correctSolved) || 0);
+  const totalMs = safeDuration * 1000;
+  const clampedElapsedMs = Math.max(0, Math.min(totalMs, Number(elapsedMs) || 0));
+  const elapsedSec = clampedElapsedMs / 1000;
+  const remainingMs = Math.max(0, totalMs - clampedElapsedMs);
+  const remClockSec = Math.ceil(remainingMs / 1000);
+  const formattedClock = formatDurationClock(remClockSec);
+
+  const expectedByNow = (elapsedSec / safeDuration) * safeTarget;
+  const paceDelta = safeSolved - expectedByNow;
+  const youPct = Math.min(100, (safeSolved / safeTarget) * 100);
+  const targetPct = Math.min(100, (elapsedSec / safeDuration) * 100);
+
+  const goalPaceLabel = safeTarget === 100 && safeDuration === 300 ? '100-in-5:00' : '20/min';
+  let targetState;
+  let targetStatusText;
+  if (safeSolved >= safeTarget) {
+    targetState = 'goal-met';
+    targetStatusText = `🏆 Goal Reached! (${safeSolved}/${safeTarget})`;
+  } else if (elapsedSec < 3 && safeSolved === 0) {
+    targetState = 'ready';
+    targetStatusText = `🎯 Target: ${safeTarget} facts in ${formatDurationClock(safeDuration)}`;
+  } else if (paceDelta >= 0.6) {
+    targetState = 'ahead';
+    targetStatusText = `🚀 Ahead of ${goalPaceLabel} pace (+${paceDelta.toFixed(1)} facts)`;
+  } else if (paceDelta <= -0.6) {
+    targetState = 'behind';
+    targetStatusText = `🔥 ${Math.abs(paceDelta).toFixed(1)} behind ${goalPaceLabel} pace`;
+  } else {
+    targetState = 'on-pace';
+    targetStatusText = `✨ Right on ${goalPaceLabel} pace!`;
+  }
+
+  const livePacePerMin = elapsedSec >= 1 ? (safeSolved / (elapsedSec / 60)) : 0;
+  const safeBestPace = Math.max(0, Number(bestPacePerMin) || 0);
+  const safeBestScore = Math.max(0, Number(bestScore) || 0);
+  const ghostExpectedByNow = safeBestPace > 0 ? (safeBestPace / 60) * elapsedSec : 0;
+  const ghostDelta = safeSolved - ghostExpectedByNow;
+  const ghostPct = safeBestPace > 0 ? Math.min(100, (ghostExpectedByNow / safeTarget) * 100) : 0;
+
+  let ghostState;
+  let ghostStatusText;
+  if (safeBestPace <= 0) {
+    ghostState = 'no-ghost';
+    ghostStatusText = '👻 Setting your first Personal Best Ghost!';
+  } else if (elapsedSec < 2 && safeSolved === 0) {
+    ghostState = 'ready';
+    ghostStatusText = `👻 Ghost Pace: ${safeBestPace.toFixed(1)}/min (${safeBestScore} facts)`;
+  } else if (ghostDelta >= 0.5) {
+    ghostState = 'ahead';
+    ghostStatusText = `⚡ Faster than Best! (${livePacePerMin.toFixed(1)} vs ${safeBestPace.toFixed(1)}/min • +${ghostDelta.toFixed(1)})`;
+  } else if (ghostDelta <= -0.5) {
+    ghostState = 'behind';
+    ghostStatusText = `👻 Chasing Ghost (${livePacePerMin.toFixed(1)} vs ${safeBestPace.toFixed(1)}/min • ${ghostDelta.toFixed(1)})`;
+  } else {
+    ghostState = 'even';
+    ghostStatusText = `🤝 Neck & neck with Best (${safeBestPace.toFixed(1)}/min)!`;
+  }
+
+  return {
+    elapsedSec,
+    remainingMs,
+    formattedClock,
+    expectedByNow,
+    paceDelta,
+    youPct,
+    targetPct,
+    targetState,
+    targetStatusText,
+    livePacePerMin,
+    ghostExpectedByNow,
+    ghostDelta,
+    ghostPct,
+    ghostState,
+    ghostStatusText
+  };
+}
+
+export function applySprintCompletion({
+  gameSave,
+  gameDef,
+  modeId,
+  correctSolved = 0,
+  attempted = 0,
+  durationSec = 300,
+  hundredthFactMs = 0,
+  now = Date.now()
+}) {
+  if (!gameSave.sprintStats || typeof gameSave.sprintStats !== 'object') {
+    gameSave.sprintStats = {};
+  }
+  const prevSprint = Object.assign(
+    { bestScore: 0, bestPacePerMin: 0, lastScore: 0, lastPacePerMin: 0, bestHundredMs: 0 },
+    gameSave.sprintStats[modeId] || {}
+  );
+
+  const safeSolved = Math.max(0, Number(correctSolved) || 0);
+  const safeAttempted = Math.max(safeSolved, Number(attempted) || 0);
+  const safeDuration = Math.max(1, Number(durationSec) || 300);
+  const pacePerMin = Math.round((safeSolved / (safeDuration / 60)) * 100) / 100;
+
+  const isNewBestScore = safeSolved > prevSprint.bestScore;
+  const isNewBestPace = pacePerMin > prevSprint.bestPacePerMin && safeSolved > 0;
+
+  gameSave.sprintStats[modeId] = {
+    bestScore: Math.max(prevSprint.bestScore, safeSolved),
+    bestPacePerMin: Math.max(prevSprint.bestPacePerMin, pacePerMin),
+    lastScore: safeSolved,
+    lastPacePerMin: pacePerMin,
+    bestHundredMs: hundredthFactMs > 0
+      ? (prevSprint.bestHundredMs > 0 ? Math.min(prevSprint.bestHundredMs, hundredthFactMs) : hundredthFactMs)
+      : prevSprint.bestHundredMs
+  };
+
+  let starsEarned = safeSolved >= 1 ? 3 : 1;
+  const breakdown = [
+    {
+      label: `⏱️ Completed ${formatDurationClock(safeDuration)} Fluency Sprint`,
+      val: `+${starsEarned} ⭐`
+    }
+  ];
+
+  if (pacePerMin >= 12) {
+    starsEarned += 1;
+    breakdown.push({ label: `⚡ Strong Speed (${pacePerMin.toFixed(1)} facts/min)`, val: '+1 ⭐' });
+  }
+  if (pacePerMin >= 20) {
+    starsEarned += 1;
+    breakdown.push({ label: '🚀 Target Fluency Pace (20+ facts/min!)', val: '+1 ⭐' });
+  }
+  const goalFacts = gameDef.grandPrizeGoalFacts || 100;
+  if (modeId === gameDef.grandPrizeModeId && safeSolved >= goalFacts) {
+    starsEarned += 2;
+    breakdown.push({
+      label: gameDef.mixBonusLabel || '⚡ 5-Minute 100-Fact Mastery Bonus',
+      val: '+2 ⭐'
+    });
+  }
+
+  gameSave.stars += starsEarned;
+  gameSave.totalSolved += safeSolved;
+  gameSave.modeStarsEarned[modeId] = (gameSave.modeStarsEarned[modeId] || 0) + starsEarned;
+
+  const prevMode = gameSave.modeStats[modeId] || {
+    rounds: 0,
+    bestFirstTry: 0,
+    totalFirstTry: 0,
+    totalQuestions: 0,
+    lastPlayedAt: 0
+  };
+  prevMode.rounds += 1;
+  prevMode.bestFirstTry = Math.max(prevMode.bestFirstTry, safeSolved);
+  prevMode.totalFirstTry += safeSolved;
+  prevMode.totalQuestions += safeAttempted;
+  prevMode.lastPlayedAt = now;
+  gameSave.modeStats[modeId] = prevMode;
+
+  const maxSec = gameDef.grandPrizeDurationSec || 300;
+  const pendingUnlocks = [];
+  if (
+    gameDef.grandPrizeId &&
+    modeId === gameDef.grandPrizeModeId &&
+    safeSolved >= goalFacts &&
+    safeDuration <= maxSec &&
+    !isCompanionUnlocked(gameSave, gameDef.grandPrizeId)
+  ) {
+    gameSave.unlockedDragons.push(gameDef.grandPrizeId);
+    const prize = (gameDef.companions || []).find(c => c.id === gameDef.grandPrizeId);
+    if (prize) pendingUnlocks.push(prize);
+  }
+
+  return {
+    starsEarned,
+    breakdown,
+    pendingUnlocks,
+    pacePerMin,
+    prevBestScore: prevSprint.bestScore,
+    prevBestPacePerMin: prevSprint.bestPacePerMin,
+    isNewBestScore,
+    isNewBestPace
+  };
+}

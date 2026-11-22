@@ -1505,3 +1505,200 @@
     font-size: 1.08rem;
   }
 }
+
+/* ================= TIMED SPRINT ARENA HUD & GHOST BAR ================= */
+.sprint-topbar-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sprint-clock-pill,
+.sprint-score-pill,
+.sprint-rate-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  border: 2px solid var(--border-warm);
+  background: var(--bg-subtle);
+  color: var(--ink-900);
+}
+
+.sprint-clock-pill {
+  background: var(--sky-100);
+  border-color: #7DD3FC;
+  color: #0369A1;
+}
+
+.sprint-clock-pill.low-time {
+  background: var(--gold-100);
+  border-color: var(--gold-500);
+  color: var(--gold-700);
+}
+
+.sprint-clock-pill.critical-time {
+  background: var(--ember-100);
+  border-color: var(--ember-500);
+  color: var(--ember-600);
+  animation: scorePulse 0.7s ease-in-out infinite;
+}
+
+.sprint-score-pill {
+  background: var(--jade-50);
+  border-color: var(--jade-500);
+  color: var(--jade-700);
+}
+
+.sprint-score-pill.goal-met {
+  background: var(--gold-400);
+  border-color: var(--gold-600);
+  color: #451A03;
+}
+
+.sprint-score-pill.pulse {
+  animation: scorePulse 0.28s ease;
+}
+
+@keyframes scorePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.sprint-pace-hud {
+  background: var(--bg-card);
+  border: 2px solid var(--border-warm);
+  border-radius: var(--radius-md);
+  padding: 9px 14px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.sprint-hud-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sprint-hud-label {
+  font-size: 0.82rem;
+  font-weight: 900;
+  color: var(--ink-900);
+}
+
+.sprint-hud-sublabel {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--ink-700);
+}
+
+.sprint-status-pill {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-warm);
+  color: var(--ink-700);
+  font-variant-numeric: tabular-nums;
+}
+
+.sprint-status-pill.state-ahead,
+.sprint-status-pill.state-on-pace,
+.sprint-status-pill.state-even {
+  background: var(--jade-100);
+  border-color: var(--jade-500);
+  color: var(--jade-700);
+}
+
+.sprint-status-pill.state-goal-met {
+  background: var(--gold-400);
+  border-color: var(--gold-600);
+  color: #451A03;
+}
+
+.sprint-status-pill.state-behind {
+  background: var(--coral-100);
+  border-color: #FDBA74;
+  color: var(--coral-600);
+}
+
+.sprint-race-track {
+  position: relative;
+  height: 14px;
+  background: #E2E8F0;
+  border-radius: 999px;
+  overflow: visible;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+  margin: 2px 8px;
+}
+
+.sprint-you-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--jade-600), var(--jade-500));
+  transition: width 0.2s ease;
+}
+
+.sprint-you-fill.state-behind {
+  background: linear-gradient(90deg, var(--coral-600), var(--gold-500));
+}
+
+.sprint-you-fill.state-goal-met {
+  background: linear-gradient(90deg, var(--gold-500), var(--gold-400));
+}
+
+.sprint-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  line-height: 1;
+  transition: left 0.15s linear;
+  pointer-events: none;
+}
+
+.sprint-target-marker {
+  background: #FFFFFF;
+  border: 2px solid var(--sky-600);
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
+  z-index: 3;
+}
+
+.sprint-ghost-marker {
+  background: #FEF3C7;
+  border: 2px solid var(--gold-600);
+  box-shadow: 0 2px 6px rgba(180, 83, 9, 0.3);
+  z-index: 2;
+}
+
+@media (max-width: 620px) {
+  .sprint-clock-pill,
+  .sprint-score-pill,
+  .sprint-rate-pill {
+    font-size: 0.78rem;
+    padding: 4px 8px;
+  }
+  .sprint-pace-hud {
+    padding: 7px 10px;
+    gap: 5px;
+  }
+}

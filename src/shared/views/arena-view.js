@@ -3,6 +3,9 @@ import { escapeHtml, launchConfetti, speakText, stopSpeaking } from '../dom.js';
 import { SFX } from '../audio.js';
 import {
   applyRoundCompletion,
+  applySprintCompletion,
+  computeSprintPaceTelemetry,
+  formatDurationClock,
   getActiveBuddy,
   getModeCompanions,
   getModeMeta,
@@ -29,6 +32,7 @@ export function createArenaController({
 }) {
   let roundState = null;
   let fluencyTimer = null;
+  let sprintTimer = null;
   let pendingUnlocks = [];
   let lastFinishedMode = 'mix';
   let detailCompanionId = null;
@@ -37,6 +41,107 @@ export function createArenaController({
     if (fluencyTimer) {
       clearInterval(fluencyTimer);
       fluencyTimer = null;
+    }
+  }
+
+  function stopSprintTimer() {
+    if (sprintTimer) {
+      clearInterval(sprintTimer);
+      sprintTimer = null;
+    }
+  }
+
+  function renderSprintTopbarSkeleton() {
+    const container = document.getElementById('progress-gems');
+    if (!container || !roundState) return;
+    container.innerHTML = `
+      <div class="sprint-topbar-strip">
+        <span id="sprint-clock-pill" class="sprint-clock-pill">⏱️ ${formatDurationClock(roundState.durationSec)}</span>
+        <span id="sprint-score-pill" class="sprint-score-pill">✅ 0 / ${roundState.targetFacts}</span>
+        <span id="sprint-rate-pill" class="sprint-rate-pill">⚡ 0.0/min</span>
+      </div>
+    `;
+  }
+
+  function tickSprintHud() {
+    if (!roundState || !roundState.isTimedSprint) {
+      stopSprintTimer();
+      return;
+    }
+
+    const now = Date.now();
+    const elapsedMs = now - roundState.startMs;
+    const tel = computeSprintPaceTelemetry({
+      correctSolved: roundState.correctSolved,
+      elapsedMs,
+      durationSec: roundState.durationSec,
+      targetFacts: roundState.targetFacts,
+      bestPacePerMin: roundState.prevBestPacePerMin,
+      bestScore: roundState.prevBestScore
+    });
+
+    const clockEl = document.getElementById('sprint-clock-pill');
+    if (clockEl) {
+      clockEl.textContent = `⏱️ ${tel.formattedClock}`;
+      clockEl.classList.toggle('low-time', tel.remainingMs <= 30000 && tel.remainingMs > 10000);
+      clockEl.classList.toggle('critical-time', tel.remainingMs <= 10000);
+    }
+
+    const scoreEl = document.getElementById('sprint-score-pill');
+    if (scoreEl) {
+      scoreEl.textContent = roundState.correctSolved >= roundState.targetFacts
+        ? `🏆 ${roundState.correctSolved} Solved!`
+        : `✅ ${roundState.correctSolved} / ${roundState.targetFacts}`;
+      scoreEl.classList.toggle('goal-met', roundState.correctSolved >= roundState.targetFacts);
+    }
+
+    const rateEl = document.getElementById('sprint-rate-pill');
+    if (rateEl) {
+      rateEl.textContent = `⚡ ${tel.livePacePerMin.toFixed(1)}/min`;
+    }
+
+    const youFill = document.getElementById('sprint-you-fill');
+    if (youFill) {
+      youFill.style.width = `${tel.youPct.toFixed(1)}%`;
+      youFill.className = `sprint-you-fill state-${tel.targetState}`;
+    }
+
+    const targetMarker = document.getElementById('sprint-target-marker');
+    if (targetMarker) {
+      targetMarker.style.left = `${tel.targetPct.toFixed(1)}%`;
+    }
+
+    const ghostMarker = document.getElementById('sprint-ghost-marker');
+    if (ghostMarker) {
+      if (roundState.prevBestPacePerMin > 0) {
+        ghostMarker.classList.remove('hidden');
+        ghostMarker.style.left = `${tel.ghostPct.toFixed(1)}%`;
+      } else {
+        ghostMarker.classList.add('hidden');
+      }
+    }
+
+    const targetStatus = document.getElementById('sprint-target-status');
+    if (targetStatus) {
+      targetStatus.textContent = tel.targetStatusText;
+      targetStatus.className = `sprint-status-pill state-${tel.targetState}`;
+    }
+
+    const ghostLabel = document.getElementById('sprint-ghost-label');
+    if (ghostLabel) {
+      ghostLabel.textContent = roundState.prevBestPacePerMin > 0
+        ? `👻 Best Pace: ${roundState.prevBestPacePerMin.toFixed(1)}/min (${roundState.prevBestScore} facts)`
+        : '👻 First Run — Setting Your Ghost Pace!';
+    }
+
+    const ghostStatus = document.getElementById('sprint-ghost-status');
+    if (ghostStatus) {
+      ghostStatus.textContent = tel.ghostStatusText;
+      ghostStatus.className = `sprint-status-pill ghost state-${tel.ghostState}`;
+    }
+
+    if (now >= roundState.endMs) {
+      finishSprintRound();
     }
   }
 
@@ -75,6 +180,7 @@ export function createArenaController({
     const { gameSave, familyState } = getContext();
     const paceBtn = document.getElementById('btn-pace-toggle');
     if (paceBtn) {
+      paceBtn.classList.toggle('hidden', Boolean(roundState && roundState.isTimedSprint));
       if (gameSave.pace === 'brisk') {
         paceBtn.textContent = '⚡ Brisk';
         paceBtn.classList.remove('relaxed');
@@ -88,6 +194,7 @@ export function createArenaController({
   }
 
   function renderProgressGems() {
+    if (roundState && roundState.isTimedSprint) return;
     const container = document.getElementById('progress-gems');
     if (!container || !roundState) return;
     container.innerHTML = roundState.results.map((res, idx) => {
@@ -118,6 +225,15 @@ export function createArenaController({
     if (!panel) return;
 
     if (q.inputType === 'numpad' || q.inputType === 'quot_rem' || q.inputType === 'step_pair' || q.inputType === 'multi_slot') {
+      if (
+        roundState &&
+        roundState.isTimedSprint &&
+        q.inputType === 'numpad' &&
+        panel.querySelector('.numpad-grid') &&
+        !panel.querySelector('#btn-switch-qr')
+      ) {
+        return;
+      }
       const isMultiSlot = q.inputType === 'multi_slot';
       const slots = isMultiSlot && Array.isArray(q.slots) ? q.slots : [];
       const isDual = q.inputType === 'quot_rem' || q.inputType === 'step_pair';
@@ -245,11 +361,15 @@ export function createArenaController({
       ? '<button type="button" class="read-aloud-btn" data-action="read-prompt">🔊 Read</button>'
       : '';
 
+    const badgeText = roundState.isTimedSprint
+      ? `${escapeHtml(q.topicLabel)} • Card #${roundState.attempted + 1}`
+      : `${escapeHtml(q.topicLabel)} • Puzzle ${roundState.index + 1} of 10`;
+
     const stage = document.getElementById('question-stage');
     if (stage) {
       stage.innerHTML = `
         <div class="question-badge-row">
-          <span class="question-topic-badge">${escapeHtml(q.topicLabel)} • Puzzle ${roundState.index + 1} of 10</span>
+          <span class="question-topic-badge">${badgeText}</span>
           ${readBtnHTML}
         </div>
         <p class="question-prompt">${q.prompt}</p>
@@ -266,7 +386,9 @@ export function createArenaController({
     if (q.inputType === 'multi_slot') {
       syncMultiSlotDisplay();
     }
-    startFluencyTimer(q.fluencySeconds || 16);
+    if (!roundState.isTimedSprint) {
+      startFluencyTimer(q.fluencySeconds || 16);
+    }
   }
 
   function syncMultiSlotDisplay() {
@@ -352,6 +474,7 @@ export function createArenaController({
     const { gameDef, gameSave } = getContext();
     const q = roundState.questions[roundState.index];
     if (!roundState.missedCurrent && q) {
+      if (roundState.isTimedSprint) roundState.attempted++;
       recordMistakeInSave(gameSave, roundState, q);
       onSave();
     }
@@ -369,17 +492,54 @@ export function createArenaController({
     }
 
     const buddy = getActiveBuddy(gameSave, gameDef);
-    setCoachLine(`<strong>${escapeHtml(buddy.name)}:</strong> "Ooh, tricky one! Check the golden clue below and enter the answer to lock it in!"`);
+    if (roundState.isTimedSprint) {
+      setCoachLine(`<strong>${escapeHtml(buddy.name)}:</strong> "Quick catch! Enter <strong>${q.answer}</strong> to lock it in and keep racing!"`);
+    } else {
+      setCoachLine(`<strong>${escapeHtml(buddy.name)}:</strong> "Ooh, tricky one! Check the golden clue below and enter the answer to lock it in!"`);
+    }
   }
 
   function handleCorrectSolve() {
     stopFluencyTimer();
     const { gameDef, gameSave } = getContext();
-    roundState.lockedTransition = true;
     const firstTry = !roundState.missedCurrent;
+    const q = roundState.questions[roundState.index];
+
+    if (roundState.isTimedSprint) {
+      if (firstTry) {
+        roundState.correctSolved++;
+        roundState.attempted++;
+        if (
+          roundState.correctSolved === roundState.targetFacts &&
+          roundState.modeId === (gameDef.grandPrizeModeId || 'mix') &&
+          !roundState.hundredthFactMs
+        ) {
+          roundState.hundredthFactMs = Date.now() - roundState.startMs;
+          launchConfetti(confettiLayerEl, 28);
+        }
+      }
+      roundState.withinFluency = firstTry;
+      recordSkillAttemptInSave(gameSave, roundState, q, firstTry);
+      onSave();
+      SFX.correct(firstTry);
+
+      roundState.questions[0] = roundState.deck.nextQuestion();
+      roundState.index = 0;
+      renderCurrentQuestion();
+      tickSprintHud();
+
+      const scorePill = document.getElementById('sprint-score-pill');
+      if (scorePill) {
+        scorePill.classList.remove('pulse');
+        void scorePill.offsetWidth;
+        scorePill.classList.add('pulse');
+      }
+      return;
+    }
+
+    roundState.lockedTransition = true;
     if (firstTry && roundState.withinFluency) roundState.fastCount++;
 
-    const q = roundState.questions[roundState.index];
     recordSkillAttemptInSave(gameSave, roundState, q, firstTry);
     onSave();
 
@@ -413,15 +573,38 @@ export function createArenaController({
     }
     const companion = pendingUnlocks[0];
     const modeMeta = getModeMeta(gameDef, companion.modeId);
+    const isColossal = Boolean(companion.isColossal);
     SFX.roundFanfare();
 
-    document.getElementById('egg-tribe-hint').textContent = `${companion.tribe} • ${modeMeta.icon} ${modeMeta.title}`;
+    const unlockCard = modalUnlockEl.querySelector('.modal-card');
+    unlockCard?.classList.toggle('colossal-modal', isColossal);
+
+    const milestoneEl = document.getElementById('unlock-milestone-kicker');
+    if (milestoneEl) {
+      milestoneEl.textContent = isColossal
+        ? '👑 100 FACTS IN 5 MINUTES CONQUERED! 👑'
+        : '🌟 10-Star Milestone Reached! 🌟';
+    }
+    const tapPromptEl = document.getElementById('unlock-tap-prompt');
+    if (tapPromptEl) {
+      tapPromptEl.textContent = isColossal
+        ? '👆 Tap the ancient animus scroll to awaken King Darkstalker!'
+        : '👆 Tap the glowing egg to hatch your new friend!';
+    }
+
+    document.getElementById('egg-tribe-hint').textContent = isColossal
+      ? `${companion.scaleLabel || companion.tribe} • ${companion.tribe}`
+      : `${companion.tribe} • ${modeMeta.icon} ${modeMeta.title}`;
     document.getElementById('unlock-heading').textContent = gameDef.unlockHeading || `A ${gameDef.companionNoun} Egg Is Hatching!`;
     const podEl = document.getElementById('unlock-pod-emoji');
     if (podEl) podEl.textContent = gameDef.unlockPodEmoji || '✨';
-    document.getElementById('unlock-reveal-kicker').textContent = `✨ New ${gameDef.companionNoun} Unlocked! ✨`;
+    document.getElementById('unlock-reveal-kicker').textContent = isColossal
+      ? '👑 Colossal Grand Champion Awakened! 👑'
+      : `✨ New ${gameDef.companionNoun} Unlocked! ✨`;
     document.getElementById('unlock-dragon-name').textContent = companion.name;
-    document.getElementById('unlock-dragon-tribe').textContent = `${companion.tribe} • ${modeMeta.title}`;
+    document.getElementById('unlock-dragon-tribe').textContent = isColossal
+      ? `${companion.scaleLabel || companion.tribe} • ${companion.tribe}`
+      : `${companion.tribe} • ${modeMeta.title}`;
     document.getElementById('unlock-dragon-img').src = companion.image;
     document.getElementById('unlock-dragon-bio').textContent = companion.bio;
     document.getElementById('unlock-dragon-quote').textContent = `"${companion.quotes[0]}"`;
@@ -432,8 +615,123 @@ export function createArenaController({
     modalUnlockEl.classList.remove('hidden');
   }
 
+  function finishSprintRound() {
+    stopFluencyTimer();
+    stopSprintTimer();
+    stopSpeaking();
+    if (!roundState) return;
+    const { gameDef, gameSave } = getContext();
+    const {
+      modeId,
+      correctSolved,
+      attempted,
+      durationSec,
+      targetFacts,
+      hundredthFactMs
+    } = roundState;
+    lastFinishedMode = modeId;
+
+    const completion = applySprintCompletion({
+      gameSave,
+      gameDef,
+      modeId,
+      correctSolved,
+      attempted,
+      durationSec,
+      hundredthFactMs
+    });
+    pendingUnlocks = completion.pendingUnlocks;
+    onSave();
+
+    arenaEl.classList.add('hidden');
+    arenaEl.classList.remove('is-timed-sprint');
+    document.getElementById('sprint-pace-hud')?.classList.add('hidden');
+    document.getElementById('btn-pace-toggle')?.classList.remove('hidden');
+    shellEl.classList.remove('hidden');
+    onRenderHub();
+
+    const modeMeta = getModeMeta(gameDef, modeId);
+    const kickerEl = document.getElementById('results-kicker');
+    if (kickerEl) kickerEl.textContent = `${modeMeta.shortTitle} Complete!`;
+
+    let headline = 'Great Fluency Practice!';
+    if (modeId === (gameDef.grandPrizeModeId || 'mix') && correctSolved >= targetFacts) {
+      headline = '100+ Facts Conquered!! 👑';
+    } else if (completion.isNewBestScore && correctSolved > 0) {
+      headline = 'New Personal Best!! ⚡';
+    } else if (completion.pacePerMin >= 20) {
+      headline = 'Lightning Fluency Pace!';
+    }
+    document.getElementById('results-headline').textContent = headline;
+    document.getElementById('results-stars-row').textContent = '⭐'.repeat(completion.starsEarned);
+
+    const accPct = attempted > 0 ? Math.round((correctSolved / attempted) * 100) : 100;
+    const ghostCompareText = completion.prevBestScore > 0
+      ? (correctSolved > completion.prevBestScore
+          ? `Beat ${completion.prevBestScore} (+${correctSolved - completion.prevBestScore}!)`
+          : (correctSolved === completion.prevBestScore ? `Tied Best (${completion.prevBestScore})` : `${correctSolved} vs Best ${completion.prevBestScore}`))
+      : `${correctSolved} (New Baseline!)`;
+
+    const summaryRows = [
+      { label: '✅ First-Try Facts Solved', val: `${correctSolved} / ${targetFacts} Goal` },
+      { label: '⚡ Fluency Speed Pace', val: `${completion.pacePerMin.toFixed(1)} facts/min (Goal: 20.0)` },
+      { label: '🎯 First-Try Accuracy', val: `${accPct}% (${correctSolved}/${attempted})` },
+      { label: '👻 Personal Best Ghost', val: ghostCompareText }
+    ];
+    if (hundredthFactMs > 0) {
+      summaryRows.push({
+        label: '⏱️ 100th Fact Split Time',
+        val: formatDurationClock(hundredthFactMs / 1000)
+      });
+    }
+
+    document.getElementById('results-breakdown').innerHTML = [
+      ...summaryRows.map(r => `<div class="breakdown-row"><span>${r.label}</span><span style="color:var(--jade-700);">${r.val}</span></div>`),
+      ...completion.breakdown.map(b => `<div class="breakdown-row"><span>${b.label}</span><span style="color:var(--gold-700);">${b.val}</span></div>`),
+      `<div class="breakdown-row" style="border-top:1px solid var(--border-warm); padding-top:6px; margin-top:4px;">
+        <span>Total Stars Collected</span>
+        <span style="color:var(--jade-700);">⭐ ${gameSave.stars} Stars</span>
+      </div>`
+    ].join('');
+
+    const grandModeId = gameDef.grandPrizeModeId || 'mix';
+    const grandGoal = gameDef.grandPrizeGoalFacts || 100;
+    const best5m = (gameSave.sprintStats && gameSave.sprintStats[grandModeId] && gameSave.sprintStats[grandModeId].bestScore) || 0;
+    const prizeUnlocked = gameDef.grandPrizeId && isCompanionUnlocked(gameSave, gameDef.grandPrizeId);
+    const fillEl = document.getElementById('results-progress-fill');
+    const capEl = document.getElementById('results-progress-caption');
+    const suggestWrap = document.getElementById('results-suggest-wrap');
+
+    if (prizeUnlocked) {
+      fillEl.style.width = '100%';
+      capEl.textContent = `👑 Colossal King Darkstalker Awakened! Best 5-Min Run: ${best5m} facts!`;
+      suggestWrap.innerHTML = '';
+    } else {
+      fillEl.style.width = `${Math.min(100, (best5m / grandGoal) * 100).toFixed(1)}%`;
+      const needed = Math.max(0, grandGoal - best5m);
+      capEl.textContent = `Best 5-Min Run: ${best5m} / ${grandGoal} facts — ${needed} more in 5:00 to awaken Colossal King Darkstalker!`;
+      suggestWrap.innerHTML = modeId !== grandModeId
+        ? `<button type="button" id="btn-results-suggest-mode" class="suggest-mode-btn" data-action="play-suggested-mode" data-mode-id="${escapeHtml(grandModeId)}">⚡ Try the 5-Minute 100-Fact Challenge →</button>`
+        : '';
+    }
+
+    const replayBtn = document.getElementById('btn-results-replay');
+    if (replayBtn) replayBtn.textContent = '🔄 Run Again →';
+
+    roundState = null;
+
+    if (pendingUnlocks.length > 0) {
+      showNextUnlockModal();
+    } else {
+      if (correctSolved >= targetFacts || completion.isNewBestScore) launchConfetti(confettiLayerEl, 26);
+      SFX.roundFanfare();
+      modalResultsEl.classList.remove('hidden');
+    }
+  }
+
   function finishRound() {
     stopFluencyTimer();
+    stopSprintTimer();
     stopSpeaking();
     const { gameDef, gameSave } = getContext();
     const firstTryCount = roundState.results.filter(r => r === 'perfect').length;
@@ -450,8 +748,16 @@ export function createArenaController({
     onSave();
 
     arenaEl.classList.add('hidden');
+    arenaEl.classList.remove('is-timed-sprint');
+    document.getElementById('sprint-pace-hud')?.classList.add('hidden');
+    document.getElementById('btn-pace-toggle')?.classList.remove('hidden');
     shellEl.classList.remove('hidden');
     onRenderHub();
+
+    const kickerEl = document.getElementById('results-kicker');
+    if (kickerEl) kickerEl.textContent = '10-Puzzle Series Complete!';
+    const replayBtn = document.getElementById('btn-results-replay');
+    if (replayBtn) replayBtn.textContent = '🔄 Play Another 10 →';
 
     const headline = firstTryCount === 10
       ? `Flawless 10/10 ${gameDef.companionNoun} Master!!`
@@ -505,22 +811,73 @@ export function createArenaController({
 
   function startRound(modeId) {
     SFX.tap();
-    const { gameDef } = getContext();
-    const questions = gameDef.buildRoundQuestions(modeId);
-    roundState = createRoundState(modeId, questions);
+    stopFluencyTimer();
+    stopSprintTimer();
+    const { gameDef, gameSave } = getContext();
+    const isTimedSprint = gameDef.gameType === 'timed-sprint' && typeof gameDef.createSprintQuestionDeck === 'function';
+
+    if (isTimedSprint) {
+      const modeMeta = getModeMeta(gameDef, modeId);
+      const durationSec = modeMeta.durationSec || 300;
+      const targetFacts = modeMeta.targetFacts || 100;
+      const deck = gameDef.createSprintQuestionDeck(modeId);
+      const firstQ = deck.nextQuestion();
+      const sprintStat = (gameSave.sprintStats && gameSave.sprintStats[modeId]) || { bestScore: 0, bestPacePerMin: 0 };
+      const now = Date.now();
+
+      roundState = Object.assign(createRoundState(modeId, [firstQ]), {
+        isTimedSprint: true,
+        deck,
+        durationSec,
+        targetFacts,
+        startMs: now,
+        endMs: now + durationSec * 1000,
+        correctSolved: 0,
+        attempted: 0,
+        hundredthFactMs: 0,
+        prevBestPacePerMin: sprintStat.bestPacePerMin || 0,
+        prevBestScore: sprintStat.bestScore || 0
+      });
+
+      arenaEl.classList.add('is-timed-sprint');
+      document.getElementById('fluency-bar-wrap')?.classList.add('hidden');
+      document.getElementById('sprint-pace-hud')?.classList.remove('hidden');
+      const targetLbl = document.getElementById('sprint-target-label');
+      if (targetLbl) {
+        const paceGoal = Math.round(targetFacts / (durationSec / 60));
+        targetLbl.textContent = `🎯 ${targetFacts} Facts in ${formatDurationClock(durationSec)} (${paceGoal}/min Pace)`;
+      }
+      renderSprintTopbarSkeleton();
+    } else {
+      arenaEl.classList.remove('is-timed-sprint');
+      document.getElementById('sprint-pace-hud')?.classList.add('hidden');
+      const questions = gameDef.buildRoundQuestions(modeId);
+      roundState = createRoundState(modeId, questions);
+    }
 
     shellEl.classList.add('hidden');
     arenaEl.classList.remove('hidden');
+    if (typeof document !== 'undefined' && document.activeElement && document.activeElement.blur) {
+      document.activeElement.blur();
+    }
     updateArenaTopControls();
     renderCurrentQuestion();
+    if (roundState.isTimedSprint) {
+      tickSprintHud();
+      sprintTimer = setInterval(tickSprintHud, 100);
+    }
   }
 
   function exitArena() {
     SFX.tap();
     stopFluencyTimer();
+    stopSprintTimer();
     stopSpeaking();
     roundState = null;
     arenaEl.classList.add('hidden');
+    arenaEl.classList.remove('is-timed-sprint');
+    document.getElementById('sprint-pace-hud')?.classList.add('hidden');
+    document.getElementById('btn-pace-toggle')?.classList.remove('hidden');
     shellEl.classList.remove('hidden');
     onRenderHub();
   }
@@ -655,11 +1012,15 @@ export function createArenaController({
           slot.classList.add('wrong-flash');
         }
         roundState.numBuf = '';
-        setTimeout(() => {
-          if (slot && roundState && !roundState.lockedTransition) {
-            (slot.querySelector('.cross-slot-val') || slot).textContent = '?';
-          }
-        }, 340);
+        if (roundState.isTimedSprint) {
+          if (slot) (slot.querySelector('.cross-slot-val') || slot).textContent = '?';
+        } else {
+          setTimeout(() => {
+            if (slot && roundState && !roundState.lockedTransition && roundState.numBuf === '') {
+              (slot.querySelector('.cross-slot-val') || slot).textContent = '?';
+            }
+          }, 340);
+        }
         handleWrongAttempt(`Enter <strong>${q.answer}</strong> on the keypad to lock it into memory!`);
       }
       return;
@@ -840,7 +1201,8 @@ export function createArenaController({
         SFX.tap();
         syncMultiSlotDisplay();
       }
-    } else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter' || (e.key === ' ' && q.inputType === 'numpad')) {
+      if (e.key === ' ' && roundState.numBuf === '' && !roundState.isTimedSprint) return;
       e.preventDefault();
       pressEnterKey();
     }
@@ -851,10 +1213,14 @@ export function createArenaController({
     const c = gameDef.companions.find(x => x.id === id);
     if (!c || !gameSave.unlockedDragons.includes(id)) return;
     const modeMeta = getModeMeta(gameDef, c.modeId);
+    const isColossal = Boolean(c.isColossal);
     SFX.tap();
     detailCompanionId = id;
+    modalDetailEl.querySelector('.modal-card')?.classList.toggle('colossal-modal', isColossal);
     document.getElementById('detail-dragon-name').textContent = c.name;
-    document.getElementById('detail-dragon-tribe').textContent = `${c.tribe} • ${modeMeta.title}`;
+    document.getElementById('detail-dragon-tribe').textContent = isColossal
+      ? `${c.scaleLabel || c.tribe} • ${c.tribe}`
+      : `${c.tribe} • ${modeMeta.title}`;
     document.getElementById('detail-dragon-img').src = c.image;
     document.getElementById('detail-dragon-bio').textContent = c.bio;
     document.getElementById('detail-dragon-quote').textContent = `"${pick(c.quotes)}"`;
@@ -1127,9 +1493,13 @@ export function createArenaController({
 
   function resetRound() {
     stopFluencyTimer();
+    stopSprintTimer();
     stopSpeaking();
     roundState = null;
     arenaEl.classList.add('hidden');
+    arenaEl.classList.remove('is-timed-sprint');
+    document.getElementById('sprint-pace-hud')?.classList.add('hidden');
+    document.getElementById('btn-pace-toggle')?.classList.remove('hidden');
     modalResultsEl.classList.add('hidden');
     modalUnlockEl.classList.add('hidden');
     modalDetailEl.classList.add('hidden');

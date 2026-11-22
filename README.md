@@ -1,16 +1,19 @@
 # Family Math Arcade
 
-A zero-build, static HTML/CSS/ES-module math arcade for elementary learners, featuring independent kid profiles, strict per-profile game assignment, three full games built on a shared XtraMath-style practice engine, synthesized Web Audio feedback, and a PIN-protected Parent Dashboard.
+A zero-build, static HTML/CSS/ES-module math arcade for elementary learners, featuring independent kid profiles, strict per-profile game assignment, four full games built on a shared XtraMath-style practice engine, synthesized Web Audio feedback, and a PIN-protected Parent Dashboard.
 
 ## Games Included
 
 1. **Factors & Multiples** (3rd Grade — `#/game/factors-and-multiples`, assigned to `grade3`)
    - Formerly *Wings of Math*, with 43 collectible Wings of Fire dragon companions.
    - Modes: **Jade Mountain Daily Mix**, **Division & Leftovers**, **Factors & Factor Pairs**, **Multiples & Patterns**, **Primes, Composites & Squares**, **GCF & LCM Arena**, and **Mystery Number (1–100)** with an interactive 1–100 Detective Grid sieve.
-2. **Addition & Subtraction** (1st Grade — `#/game/addition-subtraction`, assigned to `grade1`)
+2. **Multiplication Facts** (3rd Grade — `#/game/multiplication-facts`, assigned to `grade3`)
+   - Timed `1 × 1` to `12 × 12` multiplication fluency sprints with zero-lag input, a live **100-in-5:00 Target Pace** race bar, a **Personal Best Ghost** chaser indicator, starter coach **Moonwatcher**, and an oversized book-faithful **Colossal King Darkstalker** grand prize unlocked by solving 100+ facts in 5 minutes or less.
+   - Modes: **5-Minute 100-Fact Challenge**, **1-Minute Speed Check**, **2:30 Half-Challenge**, **Foundation Sprint (×1, ×2, ×5, ×10)**, **Core Tables Sprint (×3, ×4, ×6)**, **Tricky Tables Sprint (×7, ×8, ×9)**, and **Big Tables & Squares (×11, ×12, n²)**.
+3. **Addition & Subtraction** (1st Grade — `#/game/addition-subtraction`, assigned to `grade1`)
    - Built around i-Ready Grade 1 mental-math strategies (*Teen Numbers as 10 and Some More*, *Make a Ten to Add*, *Use a Ten to Subtract*) with a warm storybook Meadow theme, `relaxed` untimed default pace, optional `🔊 Read` prompt speech synthesis, visual number-path jump arcs, counter-slide / break-apart bonds, interactive **20-Frame Counters**, and 29 collectible Dog Man & Supa Buddies companions.
    - Modes: **Supa Buddies Daily Mix**, **Teen Numbers & Friends of 10**, **Make a Ten to Add**, **Use a Ten to Subtract**, **Doubles & Near-Doubles**, **Fluency Within 10**, and **Fact Families & Balance**.
-3. **100-Chart Cross Puzzles** (1st Grade — `#/game/hundreds-chart`, assigned to `grade1`)
+4. **100-Chart Cross Puzzles** (1st Grade — `#/game/hundreds-chart`, assigned to `grade1`)
    - Built around i-Ready Grade 1 Lesson 14C (*"Finish the Puzzle"* — 100-chart & 120-chart cross cutouts) with a sunlit Sky theme, multi-box cross input with partial progress lock-in, interactive 1–100 / 1–120 chart peek with clue highlighting and cross spotlighting, and 29 collectible Dog Man & Supa Buddies Chart Detectives led by Cat Kid.
    - Modes: **Supa Chart Daily Mix**, **10 Less, 10 More & ±1 Hops**, **Center-Clue Crosses**, **Two-Clue Crosses (Find Middle!)**, **One-Clue Cross Detective**, **Chart Windows & Oops Detective**, and **Beyond 100: The 120-Chart!**.
 
@@ -26,7 +29,7 @@ Then open `http://localhost:8080/` in your browser. All paths are relative (`./c
 
 ## Kid Profiles & Legacy Save Migration
 
-- Default profiles: **3rd Grader** (`🐉`, `grade3` → *Factors & Multiples*) and **1st Grader** (`🐶`, `grade1` → *Addition & Subtraction* and *100-Chart Cross Puzzles*), stored under `localStorage['math_arcade_save_v1']`.
+- Default profiles: **3rd Grader** (`🐉`, `grade3` → *Factors & Multiples* and *Multiplication Facts*) and **1st Grader** (`🐶`, `grade1` → *Addition & Subtraction* and *100-Chart Cross Puzzles*), stored under `localStorage['math_arcade_save_v1']`.
 - Automatic non-destructive migrations:
   - `localStorage['wings_of_math_save_v1']` migrates into `grade3`’s `factors-and-multiples` save.
   - Existing `math_arcade_save_v1` saves keyed under `primes-and-factors` migrate automatically into `factors-and-multiples`.

@@ -28,9 +28,17 @@ export function createDefaultModeZeroMap(allModeIds) {
   return map;
 }
 
+export function createDefaultSprintStats(allModeIds) {
+  const stats = {};
+  allModeIds.forEach(m => {
+    stats[m] = { bestScore: 0, bestPacePerMin: 0, lastScore: 0, lastPacePerMin: 0, bestHundredMs: 0 };
+  });
+  return stats;
+}
+
 export function createDefaultGameSave(gameDef) {
   const starterId = gameDef.starterId || (gameDef.companions[0] && gameDef.companions[0].id) || '';
-  return {
+  const save = {
     stars: 0,
     activeBuddyId: starterId,
     soundOn: true,
@@ -44,6 +52,10 @@ export function createDefaultGameSave(gameDef) {
     recentMistakes: [],
     v1LegacyStars: 0
   };
+  if (gameDef.gameType === 'timed-sprint') {
+    save.sprintStats = createDefaultSprintStats(gameDef.allModeIds);
+  }
+  return save;
 }
 
 export function normalizeAndMigrateGameSave(parsed, gameDef) {
@@ -67,6 +79,22 @@ export function normalizeAndMigrateGameSave(parsed, gameDef) {
   allModeIds.forEach(m => {
     merged.modeStats[m] = Object.assign({}, baseStats[m], rawStats[m] || {});
   });
+
+  if (gameDef.gameType === 'timed-sprint') {
+    const baseSprint = createDefaultSprintStats(allModeIds);
+    const rawSprint = (parsed.sprintStats && typeof parsed.sprintStats === 'object') ? parsed.sprintStats : {};
+    merged.sprintStats = {};
+    allModeIds.forEach(m => {
+      const src = rawSprint[m] && typeof rawSprint[m] === 'object' ? rawSprint[m] : {};
+      merged.sprintStats[m] = {
+        bestScore: typeof src.bestScore === 'number' && src.bestScore >= 0 ? src.bestScore : baseSprint[m].bestScore,
+        bestPacePerMin: typeof src.bestPacePerMin === 'number' && src.bestPacePerMin >= 0 ? src.bestPacePerMin : baseSprint[m].bestPacePerMin,
+        lastScore: typeof src.lastScore === 'number' && src.lastScore >= 0 ? src.lastScore : baseSprint[m].lastScore,
+        lastPacePerMin: typeof src.lastPacePerMin === 'number' && src.lastPacePerMin >= 0 ? src.lastPacePerMin : baseSprint[m].lastPacePerMin,
+        bestHundredMs: typeof src.bestHundredMs === 'number' && src.bestHundredMs >= 0 ? src.bestHundredMs : baseSprint[m].bestHundredMs
+      };
+    });
+  }
 
   merged.modeBank = Object.assign(
     createDefaultModeZeroMap(allModeIds),

@@ -257,6 +257,43 @@ select:focus-visible {
   display: block;
 }
 
+.modal-card.colossal-modal {
+  max-width: 640px;
+  border-color: var(--gold-500);
+  background: linear-gradient(180deg, #0C192C 0%, #132846 100%);
+  color: #F8FAFC;
+}
+
+.modal-card.colossal-modal h2 {
+  color: #FFFFFF;
+}
+
+.modal-card.colossal-modal #unlock-dragon-bio,
+.modal-card.colossal-modal #detail-dragon-bio,
+.modal-card.colossal-modal #unlock-tap-prompt {
+  color: #E2E8F0 !important;
+}
+
+.modal-card.colossal-modal #unlock-dragon-quote,
+.modal-card.colossal-modal #detail-dragon-quote {
+  color: #FDE68A !important;
+}
+
+.modal-card.colossal-modal .hatch-portrait-hero {
+  width: min(340px, 78vw);
+  height: min(340px, 78vw);
+  border-radius: 26px;
+  border-width: 4px;
+  border-color: var(--gold-400);
+  box-shadow: 0 16px 40px rgba(2, 132, 199, 0.42), 0 0 0 3px rgba(251, 191, 36, 0.3);
+}
+
+.modal-card.colossal-modal .secondary-action-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #F8FAFC;
+}
+
 /* Interactive Egg Hatching Stage */
 .egg-stage {
   padding: 16px 8px;
