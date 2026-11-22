@@ -17,22 +17,23 @@ const WARES = [
   { plural: 'gold coins', emoji: '🪙' },
   { plural: 'crowns', emoji: '👑' },
   { plural: 'pearls', emoji: '🦪' },
-  { plural: 'scales mail capes', emoji: '🧥' },
+  { plural: 'scale mail capes', emoji: '🧥' },
   { plural: 'treasure maps', emoji: '🗺️' }
 ];
 
 const DRAGON_NAMES = ['Qibli', 'Sunny', 'Clay', 'Glory', 'Starflight', 'Tsunami'];
 
+function storySideHTML(hoard) {
+  if ((hoard.items.length === 0 && hoard.hero) || hoard.items.length > 1) {
+    return `${hoard.hero} = <strong>${moneyLabel(hoard.total)}</strong>`;
+  }
+  return `<strong>${moneyLabel(hoard.total)}</strong>`;
+}
+
 function explainStory(left, right) {
   const symbol = compareSymbol(left.total, right.total);
-  const leftLine = left.hero
-    ? `${left.hero} = <strong>${moneyLabel(left.total)}</strong>`
-    : `<strong>${moneyLabel(left.total)}</strong>`;
-  const rightLine = right.hero && right.items.length === 0
-    ? `${right.hero} = <strong>${moneyLabel(right.total)}</strong>`
-    : right.items.length > 1
-      ? `${right.hero} = <strong>${moneyLabel(right.total)}</strong>`
-      : `<strong>${moneyLabel(right.total)}</strong>`;
+  const leftLine = storySideHTML(left);
+  const rightLine = storySideHTML(right);
 
   if (symbol === '=') {
     return `${leftLine} &nbsp;•&nbsp; ${rightLine}<br/>Both amounts match — either way you get the same money!`;
@@ -74,10 +75,15 @@ function secondDealNear(targetDollars, avoidGroups, avoidEach) {
   for (let attempt = 0; attempt < 60; attempt++) {
     const groups = randInt(3, 9);
     const each = Math.round(wanted / groups);
-    if (each >= 11 && each <= 78 && looks(groups, each)) return { groups, each, total: groups * each };
+    if (each >= 11 && each <= 78 && looks(groups, each) && groups * each !== targetDollars) {
+      return { groups, each, total: groups * each };
+    }
   }
   const groups = avoidGroups === 6 ? 7 : 6;
-  const each = Math.max(11, Math.round(wanted / groups));
+  let each = Math.min(78, Math.max(11, Math.round(wanted / groups)));
+  if (groups * each === targetDollars) {
+    each = each < 78 ? each + 1 : each - 1;
+  }
   return { groups, each, total: groups * each };
 }
 

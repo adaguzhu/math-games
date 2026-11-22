@@ -50,7 +50,7 @@ export const COMPANIONS = [
     name: 'Blaze',
     tribe: 'SandWing',
     stars: 10,
-    bio: 'Showy treasure hoarder who loves comparing his golden piles out loud for everybody to see.',
+    bio: 'Showy treasure hoarder who loves comparing her golden piles out loud for everybody to see.',
     quotes: [
       'Behold my magnificent piles! Which one is worth more, eh?',
       'Compare the TENS first — a hundred-treasure dragon always does!',
@@ -187,7 +187,7 @@ export const COMPANIONS = [
     name: 'Snowfall',
     tribe: 'IceWing',
     stars: 10,
-    bio: 'Kind IceWing healist who spends her whole allowance on medicine and still ends the week ahead.',
+    bio: 'Kind IceWing healer who spends her whole allowance on medicine and still ends the week ahead.',
     quotes: [
       '$60 earned and −$25 spent leaves $35 in the pouch.',
       'A negative is not a failure — it’s just money going out.',

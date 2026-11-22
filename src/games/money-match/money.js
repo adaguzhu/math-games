@@ -327,9 +327,10 @@ export function nearbyTotalDollars(totalDollars, opts = {}) {
   return Math.max(minDollars, Math.min(maxDollars, totalDollars + (totalDollars > maxDollars / 2 ? -step : step)));
 }
 
-/** Split `total` into `count` unequal-ish parts (each ≥ `minPart`). */
+/** Split `total` into `count` unequal-ish parts (each ≥ `minPart` when `total` allows). */
 export function splitDollars(total, count, minPart = 40) {
-  const floor = Math.max(minPart, Math.floor(total / (count * 3)));
+  const effectiveMin = Math.max(1, Math.min(minPart, Math.floor(total / count)));
+  const floor = Math.max(effectiveMin, Math.floor(total / (count * 3)));
   const parts = Array.from({ length: count }, () => floor);
   let rest = total - floor * count;
   let guard = 0;
@@ -340,6 +341,10 @@ export function splitDollars(total, count, minPart = 40) {
     rest -= Math.min(add, rest);
     guard += 1;
     if (guard > 200) break;
+  }
+  if (rest > 0) {
+    parts[0] += rest;
+    rest = 0;
   }
   return parts;
 }
@@ -465,6 +470,8 @@ export function randomBillStack(maxDollars = 520, allowCoins = true) {
     const dollars = bills.reduce((s, b) => s + b, 0);
     const cents = coins.reduce((s, c) => s + c, 0);
     if (dollars + cents / 100 <= maxDollars && dollars >= 90) {
+      bills.sort((a, b) => b - a);
+      coins.sort((a, b) => b - a);
       return billHoard(bills, coins);
     }
   }

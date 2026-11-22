@@ -15,7 +15,15 @@ import {
   genMarket,
   buildRoundQuestions
 } from '../src/games/money-match/generators/index.js';
-import { moneyLabel, signedExpression, cashHoard, debtHoard } from '../src/games/money-match/money.js';
+import {
+  moneyLabel,
+  signedExpression,
+  cashHoard,
+  debtHoard,
+  splitDollars,
+  buildCompareQuestion
+} from '../src/games/money-match/money.js';
+import { formatCorrectAnswer } from '../src/shared/round-engine.js';
 import { applyRoundCompletion, calculateRoundStars } from '../src/shared/progression.js';
 import { createDefaultGameSave } from '../src/shared/storage.js';
 
@@ -342,4 +350,93 @@ test('Ten first-try matches hatches exactly one dragon egg (Money Match star rul
     def.companions.map(c => (c.modeId === 'starter' ? 'starter' : c.modeId))
   );
   assert.equal(reachable.size, def.allModeIds.length + 1);
+});
+
+test('Regression invariants: splitDollars, fairdeals alignment, market no-ties/explanations, plusminus bounds, and tie formatting', () => {
+  // 1. splitDollars exact-sum invariant even when total < minPart * count
+  for (const [total, count, minPart] of [[36, 2, 40], [20, 2, 40], [75, 2, 40], [45, 3, 40], [240, 2, 70]]) {
+    for (let i = 0; i < 40; i++) {
+      const parts = splitDollars(total, count, minPart);
+      assert.equal(parts.length, count);
+      assert.equal(parts.reduce((s, p) => s + p, 0), total, `splitDollars(${total}, ${count}, ${minPart}) summed to ${parts}`);
+      assert.ok(parts.every(p => Number.isInteger(p) && p >= 1));
+    }
+  }
+
+  // 2. genFairDeals strict alignment between skillKey and equality across 500 draws
+  for (let i = 0; i < 500; i++) {
+    const q = genFairDeals();
+    assertValidDuelQuestion(q, 'fairdeals');
+    if (q.skillKey === 'money_equal_yes') {
+      assert.equal(q.leftTotal, q.rightTotal, `money_equal_yes had unequal totals in ${q.dedupeKey}`);
+      assert.equal(q.answer, 'equal');
+    } else {
+      assert.equal(q.skillKey, 'money_equal_no');
+      assert.notEqual(q.leftTotal, q.rightTotal, `money_equal_no had equal totals in ${q.dedupeKey}`);
+      assert.notEqual(q.answer, 'equal');
+    }
+  }
+
+  // 3. genMarket never produces ties and never emits redundant $X = <strong>$X</strong> in explanationHTML
+  for (let i = 0; i < 500; i++) {
+    const q = genMarket();
+    assertValidDuelQuestion(q, 'market');
+    assert.notEqual(q.leftTotal, q.rightTotal, `genMarket produced tie in ${q.dedupeKey}`);
+    assert.equal(q.choices.length, 2, `genMarket should have 2 choices in ${q.dedupeKey}`);
+    assert.equal(/(?:^|[\s>])(\$\d+(?:\.\d{2})?) = <strong>\1<\/strong>/.test(q.explanationHTML), false,
+      `Redundant flat equation in explanationHTML: ${q.explanationHTML}`);
+  }
+
+  // 4. genPlusMinus stays within ±88000 cents, uses "owe the LEAST" only when both < 0, and has >= 2 chips per side
+  for (let i = 0; i < 500; i++) {
+    const q = genPlusMinus();
+    assertValidDuelQuestion(q, 'plusminus');
+    assert.ok(Math.abs(q.leftTotal) <= 88000 && Math.abs(q.rightTotal) <= 88000,
+      `genPlusMinus total exceeded ±88000 cents in ${q.dedupeKey}: ${q.leftTotal}, ${q.rightTotal}`);
+    const bothNeg = q.leftTotal < 0 && q.rightTotal < 0;
+    assert.equal(q.stageHTML.includes('owe the LEAST'), bothNeg,
+      `"owe the LEAST" mismatch (bothNeg=${bothNeg}) in ${q.dedupeKey}`);
+    const [leftStage, rightStage] = q.stageHTML.split('duel-vs');
+    assert.ok((leftStage.match(/class="money-chip /g) || []).length >= 2, `Left side < 2 chips in ${q.dedupeKey}`);
+    assert.ok((rightStage.match(/class="money-chip /g) || []).length >= 2, `Right side < 2 chips in ${q.dedupeKey}`);
+  }
+
+  // 5. formatCorrectAnswer returns friendly label for tie questions and keeps Left/Right prefixes otherwise
+  const tieQ = buildCompareQuestion({
+    modeId: 'fairdeals',
+    skillKey: 'money_equal_yes',
+    skillLabel: 'Proving Two Amounts Are Equal',
+    topicLabel: 'Equal or Not?',
+    prompt: 'Which gives MOST money?',
+    dedupeKey: 'test_tie',
+    left: cashHoard([100]),
+    right: cashHoard([45, 55]),
+    showEqualOption: true
+  });
+  assert.equal(tieQ.answer, 'equal');
+  assert.equal(formatCorrectAnswer(tieQ), '🤝 They’re Equal!');
+
+  const leftWinQ = buildCompareQuestion({
+    modeId: 'wallets',
+    skillKey: 'money_sum2',
+    skillLabel: 'Adding 3-Digit Amounts',
+    topicLabel: 'Wallet Showdown',
+    prompt: 'Which gives MOST money?',
+    dedupeKey: 'test_left',
+    left: cashHoard([250]),
+    right: cashHoard([110, 120])
+  });
+  assert.equal(formatCorrectAnswer(leftWinQ), 'Left $250');
+
+  const rightWinQ = buildCompareQuestion({
+    modeId: 'wallets',
+    skillKey: 'money_sum2',
+    skillLabel: 'Adding 3-Digit Amounts',
+    topicLabel: 'Wallet Showdown',
+    prompt: 'Which gives MOST money?',
+    dedupeKey: 'test_right',
+    left: cashHoard([200]),
+    right: cashHoard([110, 120])
+  });
+  assert.equal(formatCorrectAnswer(rightWinQ), 'Right $110 + $120');
 });

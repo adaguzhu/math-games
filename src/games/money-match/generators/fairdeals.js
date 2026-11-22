@@ -55,6 +55,15 @@ function twinDecompositions(total) {
     second = splitDollars(total, 2, 60);
     guard += 1;
   }
+  if (same(second)) {
+    for (const d of [1, -1, 2, -2]) {
+      const cand = [first[0] + d, first[1] - d];
+      if (cand[0] >= 1 && cand[1] >= 1 && !same(cand)) {
+        second = cand;
+        break;
+      }
+    }
+  }
   return [first, second];
 }
 
@@ -95,8 +104,8 @@ export function genFairDeals() {
     const product = groups * each;
     const otherTotal = wantEqual
       ? product
-      : nearbyTotalDollars(product, { fraction: 0.09, minGapDollars: 3, minDollars: 60 });
-    const parts = splitDollars(otherTotal, 2, 40);
+      : nearbyTotalDollars(product, { fraction: 0.09, minGapDollars: 3, minDollars: 20 });
+    const parts = splitDollars(otherTotal, 2, Math.min(40, Math.floor(otherTotal / 3)));
     const story = groupHoard({
       groups,
       eachDollars: each,

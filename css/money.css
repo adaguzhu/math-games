@@ -55,6 +55,18 @@
   background: linear-gradient(160deg, #FFFDF6 0%, #F2F6FF 100%);
 }
 
+.hoard-card.correct {
+  background: var(--jade-100);
+  border-color: var(--jade-600);
+  color: var(--jade-700);
+}
+
+.hoard-card.wrong {
+  background: var(--ember-100);
+  border-color: var(--ember-500);
+  color: var(--ember-600);
+}
+
 .hoard-tag {
   font-size: 0.76rem;
   font-weight: 900;

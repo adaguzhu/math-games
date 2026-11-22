@@ -9,8 +9,7 @@ import {
   mixedHoard,
   moneyLabel,
   nearbyDelta,
-  randomSign,
-  signedExpression
+  randomSign
 } from '../money.js';
 
 const HINT_MIX = 'Money earned is positive (+) and money spent is negative (−). Add each side up, then take the bigger amount!';
@@ -55,9 +54,11 @@ function storyForTotal(total, forceThree = false) {
     if (extra) terms.push(-extra);
   } else {
     const owed = -total;
-    const earn = Math.random() < 0.75 ? randInt(40, Math.max(50, Math.min(240, MAX_TERM - owed))) : 0;
+    const earn = (owed < 60 || Math.random() < 0.75)
+      ? randInt(40, Math.max(50, Math.min(240, MAX_TERM - owed)))
+      : 0;
     const spend = owed + earn;
-    if (wantThree && spend >= 60) {
+    if ((earn === 0 || wantThree) && spend >= 60) {
       const part = randInt(25, spend - 25);
       terms.push(-part, -(spend - part));
     } else {
@@ -78,28 +79,46 @@ function baseTotal() {
 export function genPlusMinus() {
   const leftTotal = baseTotal();
   const wantTie = Math.random() < 0.08;
-  const gap = wantTie
-    ? 0
-    : nearbyDelta(leftTotal * 100, { minCents: 1500, fraction: 0.09, maxCents: 6000 });
-
-  let rightTotal = leftTotal + randomSign() * Math.round(gap / 100);
-  if (Math.abs(rightTotal) > MAX_TOTAL) rightTotal = leftTotal - randomSign() * Math.round(gap / 100);
-  if (Math.abs(rightTotal) > MAX_TOTAL) rightTotal = Math.sign(leftTotal) * MAX_TOTAL;
-  if (rightTotal === leftTotal && !wantTie) {
-    rightTotal = leftTotal + (Math.abs(leftTotal) + 25 > MAX_TOTAL ? -25 : 25);
+  let rightTotal;
+  if (wantTie) {
+    rightTotal = leftTotal;
+  } else {
+    const gap = nearbyDelta(leftTotal * 100, { minCents: 1500, fraction: 0.09, maxCents: 6000 });
+    const step = Math.max(15, Math.round(gap / 100));
+    const dir = randomSign();
+    let candidate = leftTotal + dir * step;
+    if (Math.abs(candidate) > MAX_TOTAL) candidate = leftTotal - dir * step;
+    rightTotal = candidate;
   }
 
-  const leftVals = storyForTotal(leftTotal);
-  let rightVals = storyForTotal(rightTotal);
+  const left = mixedHoard(storyForTotal(leftTotal), 'Earn & spend');
+  let right = mixedHoard(storyForTotal(rightTotal), 'Earn & spend');
   // Two sides that read the same way are no puzzle at all, so on a tie the
   // right-hand story gets rebuilt until it looks different.
-  for (let attempt = 0; attempt < 6 && signedExpression(rightVals) === signedExpression(leftVals); attempt++) {
-    rightVals = storyForTotal(rightTotal, true);
+  for (let attempt = 0; attempt < 12 && right.hero === left.hero; attempt++) {
+    right = mixedHoard(storyForTotal(rightTotal, attempt >= 4), 'Earn & spend');
+  }
+  if (right.hero === left.hero && right.items.length >= 2) {
+    const adjusted = right.items.map(it => it.cents / 100);
+    if (adjusted[0] !== adjusted[adjusted.length - 1]) {
+      adjusted.push(adjusted.shift());
+    } else if (adjusted[0] > 0) {
+      adjusted[0] -= 1;
+      adjusted[1] += 1;
+    } else {
+      adjusted[0] += 1;
+      adjusted[1] -= 1;
+    }
+    right = mixedHoard(adjusted, 'Earn & spend');
   }
 
-  const left = mixedHoard(leftVals, 'Earn & spend');
-  const right = mixedHoard(rightVals, 'Earn & spend');
-  const someoneBroke = left.total < 0 || right.total < 0;
+  const bothDebt = left.total < 0 && right.total < 0;
+  const oneDebt = (left.total < 0) !== (right.total < 0);
+  const debtHint = bothDebt
+    ? 'Both sides ended below $0 — the dragon closer to $0 owes LESS and wins!'
+    : (oneDebt
+        ? 'One side ended below $0 — that dragon is in debt, so the positive side has more money.'
+        : '');
 
   return buildCompareQuestion({
     modeId: 'plusminus',
@@ -107,15 +126,13 @@ export function genPlusMinus() {
     skillLabel: 'Adding Up to Three Signed Amounts',
     topicLabel: 'Earn & Spend Mix',
     prompt: '🎯 Goal: the MOST money! Each dragon earned money and spent money. Which pocket ends up with MORE?',
-    goal: someoneBroke ? DEBT_GOAL : CASH_GOAL,
+    goal: bothDebt ? DEBT_GOAL : CASH_GOAL,
 
     dedupeKey: `pmx_${left.total}_${right.total}`,
     fluencySeconds: 45,
     left,
     right,
-    debtHint: someoneBroke
-      ? 'One side ended below $0 — that dragon is in debt, so it’s the worse amount of money.'
-      : '',
+    debtHint,
     helperText: 'Add all the earnings together, add all the spending together, then subtract: earnings − spending.',
     explanationHTML: explainMixed(left, right)
   });
