@@ -48,5 +48,3 @@ Run the Node unit & fuzz test suite (Node 18+):
 ```bash
 node --test tests/*.test.js
 ```
-
-`tests/money-match-generators.test.js` fuzzes all six Money Match generators (700 draws each) and asserts the game's core invariant: the recorded answer is always the mathematically greater amount (so the smaller debt wins in the negative quest), ties only ever offer the *They're Equal!* button, and ten first-try matches hatch exactly one dragon egg. A separate challenge-level test keeps the numbers honest: most puzzles must involve `$100+` amounts, three-quarters of the comparisons must be too close to guess, bill piles must still carry odd cents and `$100` bills, and market stories must multiply by 2-digit prices.
