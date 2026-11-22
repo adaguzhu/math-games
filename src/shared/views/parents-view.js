@@ -112,6 +112,15 @@ export function createParentsController({
       return { meta: m, stat: st, acc };
     });
 
+    const isTimedSprint = gameDef.gameType === 'timed-sprint';
+    const sprintStats = gameSave.sprintStats || {};
+    const grandModeId = gameDef.grandPrizeModeId || 'mix';
+    const grandGoal = gameDef.grandPrizeGoalFacts || 100;
+    const grandSprint = sprintStats[grandModeId] || { bestScore: 0, bestPacePerMin: 0 };
+    const best5m = grandSprint.bestScore || 0;
+    const best5mPace = grandSprint.bestPacePerMin || 0;
+    const prizeUnlocked = gameDef.grandPrizeId ? isCompanionUnlocked(gameSave, gameDef.grandPrizeId) : false;
+
     const overallAcc = totalQuestions > 0 ? Math.round((totalFirstTry / totalQuestions) * 100) + '%' : '—';
     const unlockedCount = getUnlockedCompanions(gameSave, gameDef).length;
 
@@ -151,12 +160,18 @@ export function createParentsController({
     const goingWellHTML = (goingWellModes.length === 0 && goingWellSkills.length === 0)
       ? '<p style="margin:0; font-size:0.86rem; color:var(--ink-500); font-weight:600;">No mastered quests yet — complete at least 2 rounds in a quest with 80%+ first-try accuracy (or 3+ attempts at 85%+ on a sub-skill) to highlight strengths here.</p>'
       : [
-          ...goingWellModes.map(x => `
+          ...goingWellModes.map(x => {
+            const sp = sprintStats[x.meta.id] || { bestScore: 0, bestPacePerMin: 0 };
+            const bestText = isTimedSprint
+              ? `${x.stat.rounds} runs • Best ${sp.bestScore} (${sp.bestPacePerMin.toFixed(1)}/min)`
+              : `${x.stat.rounds} rounds • Best ${x.stat.bestFirstTry}/10`;
+            return `
             <div class="insight-item good">
-              <span>${x.meta.icon} ${escapeHtml(x.meta.title)} <small style="color:var(--ink-500);">(${x.stat.rounds} rounds • Best ${x.stat.bestFirstTry}/10)</small></span>
+              <span>${x.meta.icon} ${escapeHtml(x.meta.title)} <small style="color:var(--ink-500);">(${bestText})</small></span>
               <span class="acc-pill good">${x.acc}% 1st-try</span>
             </div>
-          `),
+          `;
+          }),
           ...goingWellSkills.map(sk => `
             <div class="insight-item good">
               <span>✨ ${escapeHtml(sk.label)} <small style="color:var(--ink-500);">(${sk.firstTry}/${sk.attempts})</small></span>
@@ -174,7 +189,7 @@ export function createParentsController({
       .sort((a, b) => a.acc - b.acc);
 
     const needsPracticeHTML = (unpracticedOrLight.length === 0 && lowAccModes.length === 0 && lowAccSkills.length === 0)
-      ? '<p style="margin:0; font-size:0.86rem; color:var(--jade-700); font-weight:700;">🎉 All 7 quests have been practiced 2+ rounds with 80%+ accuracy and no struggling sub-skills!</p>'
+      ? `<p style="margin:0; font-size:0.86rem; color:var(--jade-700); font-weight:700;">🎉 All ${gameDef.allModesMeta.length} quests have been practiced 2+ rounds with 80%+ accuracy and no struggling sub-skills!</p>`
       : [
           ...lowAccModes.map(x => `
             <div class="insight-item alert">
@@ -205,12 +220,24 @@ export function createParentsController({
       const sharePct = totalRounds > 0 ? Math.round((rounds / totalRounds) * 100) : 0;
       const accLabel = x.acc === null ? '—' : `${x.acc}%`;
       const accCls = x.acc === null ? 'none' : (x.acc >= 80 ? 'good' : (x.acc >= 60 ? 'mid' : 'low'));
-      const mComps = getModeCompanions(gameDef, x.meta.id);
-      const mUnl = mComps.filter(c => isCompanionUnlocked(gameSave, c.id)).length;
-      const mBank = gameSave.modeBank[x.meta.id] || 0;
-      const compCell = mUnl < mComps.length
-        ? `${gameDef.companionEmoji} ${mUnl}/${mComps.length} (${mBank}/10 ⭐)`
-        : `${gameDef.companionEmoji} ${mComps.length}/${mComps.length} ✓`;
+
+      let bestCell;
+      let compCell;
+      if (isTimedSprint) {
+        const sp = sprintStats[x.meta.id] || { bestScore: 0, bestPacePerMin: 0 };
+        bestCell = rounds > 0 ? `Best: ${sp.bestScore} (${sp.bestPacePerMin.toFixed(1)}/m)` : 'Best: —';
+        compCell = x.meta.id === grandModeId
+          ? `👑 Grand Prize (${prizeUnlocked ? 'Awakened ✓' : `${best5m}/${grandGoal}`})`
+          : '🎯 Speed Training';
+      } else {
+        bestCell = `Best: ${rounds > 0 ? `${st.bestFirstTry}/10` : '—'}`;
+        const mComps = getModeCompanions(gameDef, x.meta.id);
+        const mUnl = mComps.filter(c => isCompanionUnlocked(gameSave, c.id)).length;
+        const mBank = gameSave.modeBank[x.meta.id] || 0;
+        compCell = mUnl < mComps.length
+          ? `${gameDef.companionEmoji} ${mUnl}/${mComps.length} (${mBank}/10 ⭐)`
+          : `${gameDef.companionEmoji} ${mComps.length}/${mComps.length} ✓`;
+      }
 
       return `
         <div class="mode-table-row">
@@ -219,7 +246,7 @@ export function createParentsController({
             <div>${rounds} ${rounds === 1 ? 'round' : 'rounds'} <small style="color:var(--ink-500);">(${sharePct}%)</small></div>
             <div class="share-bar-track"><div class="share-bar-fill" style="width:${sharePct}%"></div></div>
           </div>
-          <div>Best: ${rounds > 0 ? `${st.bestFirstTry}/10` : '—'}</div>
+          <div>${bestCell}</div>
           <div><span class="acc-pill ${accCls}">Acc: ${accLabel}</span></div>
           <div style="font-size:0.8rem; color:var(--ink-700);">${compCell}</div>
           <div><button type="button" class="parent-small-btn" data-action="parent-start-mode" data-mode-id="${escapeHtml(x.meta.id)}">Start →</button></div>
@@ -285,6 +312,7 @@ export function createParentsController({
       const groups = [{ id: 'starter', icon: '🌟', title: 'Starter Companion' }, ...gameDef.allModesMeta];
       adminGridHTML = groups.map(g => {
         const list = getModeCompanions(gameDef, g.id);
+        if (list.length === 0) return '';
         return `
           <div style="margin-bottom:14px;">
             <h4 style="margin:0 0 8px; font-size:0.92rem; color:var(--jade-700);">${g.icon} ${escapeHtml(g.title)} (${list.filter(c => isCompanionUnlocked(gameSave, c.id)).length}/${list.length})</h4>
@@ -335,22 +363,41 @@ export function createParentsController({
       </div>
 
       <div class="parents-kpi-grid">
-        <div class="parents-kpi-card">
-          <div class="parents-kpi-label">Puzzles Solved</div>
-          <div class="parents-kpi-val">${gameSave.totalSolved}</div>
-        </div>
-        <div class="parents-kpi-card">
-          <div class="parents-kpi-label">First-Try Accuracy</div>
-          <div class="parents-kpi-val">${overallAcc}</div>
-        </div>
-        <div class="parents-kpi-card">
-          <div class="parents-kpi-label">Quests Explored</div>
-          <div class="parents-kpi-val">${modesExplored} / ${gameDef.allModesMeta.length}</div>
-        </div>
-        <div class="parents-kpi-card">
-          <div class="parents-kpi-label">${escapeHtml(gameDef.companionNounPlural)} Unlocked</div>
-          <div class="parents-kpi-val">${unlockedCount} / ${gameDef.companions.length}</div>
-        </div>
+        ${isTimedSprint ? `
+          <div class="parents-kpi-card">
+            <div class="parents-kpi-label">Facts Solved</div>
+            <div class="parents-kpi-val">${gameSave.totalSolved}</div>
+          </div>
+          <div class="parents-kpi-card">
+            <div class="parents-kpi-label">First-Try Accuracy</div>
+            <div class="parents-kpi-val">${overallAcc}</div>
+          </div>
+          <div class="parents-kpi-card">
+            <div class="parents-kpi-label">5-Min Best</div>
+            <div class="parents-kpi-val">${best5m} / ${grandGoal}</div>
+          </div>
+          <div class="parents-kpi-card">
+            <div class="parents-kpi-label">5-Min Best Pace</div>
+            <div class="parents-kpi-val">${best5mPace.toFixed(1)} / min</div>
+          </div>
+        ` : `
+          <div class="parents-kpi-card">
+            <div class="parents-kpi-label">Puzzles Solved</div>
+            <div class="parents-kpi-val">${gameSave.totalSolved}</div>
+          </div>
+          <div class="parents-kpi-card">
+            <div class="parents-kpi-label">First-Try Accuracy</div>
+            <div class="parents-kpi-val">${overallAcc}</div>
+          </div>
+          <div class="parents-kpi-card">
+            <div class="parents-kpi-label">Quests Explored</div>
+            <div class="parents-kpi-val">${modesExplored} / ${gameDef.allModesMeta.length}</div>
+          </div>
+          <div class="parents-kpi-card">
+            <div class="parents-kpi-label">${escapeHtml(gameDef.companionNounPlural)} Unlocked</div>
+            <div class="parents-kpi-val">${unlockedCount} / ${gameDef.companions.length}</div>
+          </div>
+        `}
       </div>
 
       ${balanceCalloutHTML}

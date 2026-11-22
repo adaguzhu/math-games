@@ -1,6 +1,6 @@
 import { escapeHtml } from '../dom.js';
 import { getActiveProfile, getGameSave } from '../storage.js';
-import { getActiveBuddy, getUnlockedCompanions } from '../progression.js';
+import { getActiveBuddy, getUnlockedCompanions, isCompanionUnlocked } from '../progression.js';
 
 export function renderArcadeView({ container, familyState, games }) {
   if (!container) return;
@@ -10,8 +10,28 @@ export function renderArcadeView({ container, familyState, games }) {
   const renderGameCard = (game) => {
     const save = getGameSave(familyState, activeProfile.id, game);
     const buddy = getActiveBuddy(save, game);
+    const isTimedSprint = game.gameType === 'timed-sprint';
     const unlockedCount = getUnlockedCompanions(save, game).length;
     const totalCompanions = game.companions.length;
+
+    let statsHTML = '';
+    if (isTimedSprint) {
+      const grandModeId = game.grandPrizeModeId || 'mix';
+      const grandGoal = game.grandPrizeGoalFacts || 100;
+      const best5m = (save.sprintStats && save.sprintStats[grandModeId] && save.sprintStats[grandModeId].bestScore) || 0;
+      const prizeUnlocked = game.grandPrizeId ? isCompanionUnlocked(save, game.grandPrizeId) : false;
+      statsHTML = `
+        <span>🏆 Best 5m: ${best5m}/${grandGoal}</span>
+        <span>${game.companionEmoji} ${prizeUnlocked ? 'Darkstalker Awakened!' : 'Grand Prize Locked'}</span>
+        <span>🎯 ${save.totalSolved} Solved</span>
+      `;
+    } else {
+      statsHTML = `
+        <span>⭐ ${save.stars} Stars</span>
+        <span>${game.companionEmoji} ${unlockedCount} / ${totalCompanions} ${escapeHtml(game.companionNounPlural)}</span>
+        <span>🎯 ${save.totalSolved} Solved</span>
+      `;
+    }
 
     return `
       <button
@@ -33,9 +53,7 @@ export function renderArcadeView({ container, familyState, games }) {
         </div>
         <p class="arcade-game-desc">${escapeHtml(game.cardDescription)}</p>
         <div class="arcade-game-stats">
-          <span>⭐ ${save.stars} Stars</span>
-          <span>${game.companionEmoji} ${unlockedCount} / ${totalCompanions} ${escapeHtml(game.companionNounPlural)}</span>
-          <span>🎯 ${save.totalSolved} Solved</span>
+          ${statsHTML}
         </div>
         <div class="arcade-play-cta">
           <span>Open ${escapeHtml(game.title)}</span>

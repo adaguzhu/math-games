@@ -89,6 +89,9 @@ export function formatCorrectAnswer(q) {
 }
 
 export function buildMistakePromptText(q) {
+  if (typeof q.promptText === 'string' && q.promptText.trim()) {
+    return q.promptText.trim();
+  }
   const base = stripHtml(q.prompt);
   if (typeof q.mistakeSummary === 'string' && q.mistakeSummary.trim()) {
     return `${base} (${q.mistakeSummary.trim()})`;

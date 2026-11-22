@@ -692,3 +692,251 @@ body[data-theme="sky"] .featured-mix-banner {
     grid-template-columns: 1fr;
   }
 }
+
+/* ================= COLOSSAL GRAND PRIZE SHOWCASE ================= */
+.colossal-award-card {
+  background: linear-gradient(135deg, #091526 0%, #102542 55%, #17345B 100%);
+  border: 3px solid var(--gold-500);
+  border-bottom-width: 6px;
+  border-radius: var(--radius-xl);
+  padding: 24px 26px;
+  margin-bottom: 22px;
+  box-shadow: 0 18px 44px rgba(9, 21, 38, 0.34), 0 0 0 1px rgba(125, 211, 252, 0.25);
+  color: #F8FAFC;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 26px;
+  align-items: center;
+}
+
+.colossal-award-card.active-buddy {
+  box-shadow: 0 20px 50px rgba(245, 158, 11, 0.32), 0 0 0 3px var(--gold-400);
+}
+
+.colossal-visual-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.colossal-portrait-box {
+  width: 360px;
+  height: 360px;
+  padding: 0;
+  border-radius: 26px;
+  overflow: hidden;
+  border: 4px solid var(--gold-400);
+  background: #081220;
+  box-shadow: 0 14px 36px rgba(2, 132, 199, 0.38);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.colossal-portrait-box.clickable {
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.colossal-portrait-box.clickable:hover {
+  transform: scale(1.02);
+  box-shadow: 0 18px 44px rgba(251, 191, 36, 0.42);
+}
+
+.colossal-portrait-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.colossal-award-card.locked .colossal-portrait-box img {
+  filter: brightness(0.16) contrast(1.18);
+  opacity: 0.78;
+}
+
+.colossal-lock-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px;
+  text-align: center;
+  background: radial-gradient(circle, rgba(9, 21, 38, 0.25) 0%, rgba(9, 21, 38, 0.7) 100%);
+}
+
+.colossal-lock-badge {
+  background: rgba(12, 25, 44, 0.92);
+  border: 2px solid var(--gold-400);
+  color: #FDE68A;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.colossal-scale-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.16);
+  border: 1.5px solid var(--gold-400);
+  color: #FDE68A;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.colossal-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.colossal-title {
+  margin: 0;
+  font-size: clamp(1.55rem, 2.8vw, 2.15rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #FFFFFF;
+}
+
+.colossal-lore-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.colossal-lore-chip {
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 0.77rem;
+  font-weight: 800;
+  background: rgba(125, 211, 252, 0.14);
+  border: 1px solid rgba(125, 211, 252, 0.42);
+  color: #BAE6FD;
+}
+
+.colossal-champion-banner {
+  padding: 9px 14px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 900;
+  background: rgba(251, 191, 36, 0.16);
+  border: 1.5px solid var(--gold-400);
+  color: #FDE68A;
+}
+
+.colossal-progress-box {
+  background: rgba(8, 18, 32, 0.55);
+  border: 1.5px solid rgba(125, 211, 252, 0.28);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.colossal-progress-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #E2E8F0;
+}
+
+.colossal-bio {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.5;
+  color: #E2E8F0;
+  font-weight: 500;
+}
+
+.colossal-quote {
+  margin: 0;
+  font-size: 0.92rem;
+  font-style: italic;
+  font-weight: 700;
+  color: #FDE68A;
+}
+
+.colossal-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.colossal-cta-btn {
+  padding: 13px 22px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #F59E0B, #FBBF24);
+  border-bottom: 4px solid #B45309;
+  color: #451A03;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.colossal-secondary-btn {
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 2px solid rgba(125, 211, 252, 0.45);
+  color: #F8FAFC;
+  font-size: 0.94rem;
+  font-weight: 800;
+}
+
+.colossal-buddy-btn {
+  padding: 12px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0284C7, #0EA5E9);
+  border-bottom: 4px solid #0369A1;
+  color: #FFFFFF;
+  font-size: 0.96rem;
+  font-weight: 900;
+}
+
+.colossal-buddy-btn.selected {
+  background: linear-gradient(135deg, #F59E0B, #FBBF24);
+  border-bottom-color: #B45309;
+  color: #451A03;
+}
+
+.sanctuary-subhead {
+  margin: 4px 0 12px;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: var(--ink-700);
+}
+
+@media (max-width: 860px) {
+  .colossal-award-card {
+    grid-template-columns: 1fr;
+    padding: 20px 18px;
+    text-align: center;
+  }
+  .colossal-lore-badges,
+  .colossal-actions-row {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 620px) {
+  .colossal-portrait-box {
+    width: min(82vw, 330px);
+    height: min(82vw, 330px);
+  }
+}

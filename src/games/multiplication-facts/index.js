@@ -1,0 +1,45 @@
+import { COMPANIONS } from './companions.js';
+import { MODES, MIX_META, ALL_MODE_IDS, ALL_MODES_META } from './modes.js';
+import { GUIDE_TITLE, GUIDE_SUBTITLE, GUIDE_HTML } from './guide.js';
+import { createSprintQuestionDeck, buildRoundQuestions } from './generators/index.js';
+
+export const MULTIPLICATION_FACTS_GAME = {
+  id: 'multiplication-facts',
+  title: 'Multiplication Facts',
+  gradeId: 'grade3',
+  assignedProfileId: 'grade3',
+  gradeLabel: '3rd Grade',
+  theme: 'sky',
+  gameType: 'timed-sprint',
+  defaultPace: 'brisk',
+  enableReadAloud: false,
+  cardDescription: 'Race the 5-minute clock across 1×1 to 12×12 multiplication flashcards! Beat your Personal Best Ghost and solve 100+ facts in 5:00 to awaken Colossal King Darkstalker!',
+  starterId: 'moonwatcher_coach',
+  grandPrizeId: 'colossal_darkstalker',
+  grandPrizeModeId: 'mix',
+  grandPrizeGoalFacts: 100,
+  grandPrizeDurationSec: 300,
+  companions: COMPANIONS,
+  companionNoun: 'Dragon',
+  companionNounPlural: 'Dragons',
+  companionNounPluralLower: 'dragons',
+  companionEmoji: '🐉',
+  unlockHeading: 'King Darkstalker Awakens!',
+  unlockPodEmoji: '📜',
+  groupLabel: 'Tribe',
+  sanctuaryTabLabel: '👑 Dragon Rewards',
+  sanctuaryTitle: '👑 Colossal King Darkstalker &amp; Coach Moonwatcher',
+  sanctuarySubtitle: 'Answer <strong>100+ multiplication facts in 5 minutes</strong> in the 5-Minute Challenge to awaken the colossal <strong>King Darkstalker</strong>!',
+  sanctuaryFilters: [],
+  guideTabLabel: '📜 Speed Scroll',
+  guideTitle: GUIDE_TITLE,
+  guideSubtitle: GUIDE_SUBTITLE,
+  guideHTML: GUIDE_HTML,
+  mixBonusLabel: '⚡ 5-Minute 100-Fact Mastery Bonus',
+  modes: MODES,
+  mixMeta: MIX_META,
+  allModeIds: ALL_MODE_IDS,
+  allModesMeta: ALL_MODES_META,
+  createSprintQuestionDeck,
+  buildRoundQuestions
+};
